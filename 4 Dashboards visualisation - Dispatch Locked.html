@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kharon Dispatch Command - Operational Engine</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        
+        :root {
+            --slate-950: #020617;
+            --slate-900: #0f172a;
+            --slate-800: #1e293b;
+            --kharon-gold: #facc15;
+        }
+
+        body { 
+            font-family: 'Inter', sans-serif; 
+            margin: 0; 
+            background-color: var(--slate-950); 
+            color: #f1f5f9;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .animate-in { animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .sidebar-item-active { 
+            background-color: rgba(255, 255, 255, 0.05); 
+            color: var(--kharon-gold); 
+            border-left: 4px solid var(--kharon-gold); 
+        }
+
+        .command-card {
+            background-color: var(--slate-900);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 1.25rem;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .command-card:hover {
+            border-color: rgba(250, 204, 21, 0.3);
+            transform: translateY(-2px);
+            background-color: #161e2e;
+        }
+
+        .modal-bg { background-color: rgba(2, 6, 23, 0.98); backdrop-filter: blur(16px); }
+        
+        input, select, textarea { 
+            outline: none; 
+            border: 1px solid rgba(255, 255, 255, 0.1); 
+            border-radius: 0.75rem; 
+            padding: 1rem; 
+            width: 100%; 
+            background-color: var(--slate-800);
+            color: white;
+            font-size: 14px;
+        }
+        
+        input:focus { border-color: var(--kharon-gold); }
+
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: var(--slate-950); }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+
+        .status-compliant { background: rgba(34, 197, 94, 0.1); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.2); }
+        .status-critical { background: rgba(239, 68, 68, 0.1); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.2); animation: pulse-red 2s infinite; }
+        .status-pending { background: rgba(250, 204, 21, 0.1); color: #facc15; border: 1px solid rgba(250, 204, 21, 0.2); }
+        
+        @keyframes pulse-red { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+        
+        .capacity-bar { height: 6px; border-radius: 3px; background: #334155; overflow: hidden; }
+        .capacity-fill { height: 100%; transition: width 1s ease-in-out; }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 1px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 1rem;
+            overflow: hidden;
+        }
+        .calendar-day { background: var(--slate-900); min-height: 120px; padding: 12px; transition: background 0.2s; }
+        .calendar-header { background: rgba(255,255,255,0.02); text-align: center; padding: 12px; font-size: 10px; font-weight: 900; text-transform: uppercase; color: rgba(255,255,255,0.3); }
+        .cal-event { font-size: 9px; padding: 4px 8px; border-radius: 6px; margin-top: 4px; font-weight: bold; overflow: hidden; text-overflow: ellipsis; }
+        
+        .fatigue-high { color: #f87171; text-shadow: 0 0 10px rgba(239, 68, 68, 0.3); }
+    </style>
+</head>
+<body class="h-screen overflow-hidden">
+    <div id="app" class="flex h-screen">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="w-72 bg-slate-900 border-r border-white/5 flex flex-col p-6 z-20 shadow-2xl overflow-y-auto">
+            <div class="flex items-center gap-4 mb-10 pb-8 border-b border-white/5">
+                <div class="w-12 h-12 bg-yellow-400 rounded-2xl flex items-center justify-center text-slate-950 shadow-lg shadow-yellow-400/20">
+                    <i data-lucide="truck"></i>
+                </div>
+                <div>
+                    <h1 class="font-black tracking-tighter text-xl uppercase leading-none text-white leading-none">Kharon</h1>
+                    <p class="text-[10px] uppercase tracking-[0.2em] text-white/30 font-bold mt-1">Logistics Hub</p>
+                </div>
+            </div>
+
+            <nav id="nav-items" class="flex-1 space-y-2 pr-2"></nav>
+
+            <div class="pt-6 border-t border-white/5 space-y-4">
+                <div class="flex items-center justify-between text-[10px] font-black uppercase text-white/20">
+                    <span>Labor Integrity</span>
+                    <span id="active-force-pct" class="text-green-500 font-black">94% Safe</span>
+                </div>
+                <button onclick="window.location.reload()" class="w-full py-4 bg-white/5 rounded-xl text-[10px] font-black uppercase tracking-widest text-white/40 hover:bg-red-500/10 hover:text-red-400 transition-all border border-white/5">Restart Terminal</button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 overflow-y-auto bg-slate-950 relative">
+            <header class="sticky top-0 z-10 bg-slate-950/90 backdrop-blur-xl px-10 py-8 border-b border-white/5 flex justify-between items-center">
+                <div>
+                    <div class="text-[10px] text-white/20 uppercase tracking-[0.3em] font-black mb-1 flex items-center gap-2">
+                        <span>Terminal 02</span> <i data-lucide="chevron-right" class="w-3 h-3"></i> <span id="current-page-crumb">Dashboard</span>
+                    </div>
+                    <h2 id="portal-title" class="text-3xl font-black text-white tracking-tighter italic uppercase leading-none">Command Pulse</h2>
+                </div>
+                <div class="flex items-center gap-6">
+                    <div class="text-right">
+                        <p class="text-xs font-black text-white leading-none mb-1 font-bold italic">Dispatcher Alpha</p>
+                        <p id="user-role-label" class="text-[10px] text-white/30 font-bold uppercase tracking-widest">Route Intelligence</p>
+                    </div>
+                    <div class="w-12 h-12 rounded-2xl bg-slate-900 flex items-center justify-center font-black text-yellow-400 border border-white/10 shadow-inner">D</div>
+                </div>
+            </header>
+
+            <div id="content-area" class="p-10 animate-in"></div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="modal-container" class="fixed inset-0 z-50 flex items-center justify-center hidden p-6">
+        <div class="modal-bg absolute inset-0" onclick="closeModal()"></div>
+        <div class="bg-slate-900 border border-white/10 rounded-[2.5rem] w-full max-w-4xl p-12 relative shadow-2xl animate-in overflow-y-auto max-h-[90vh]" id="modal-content"></div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-10 right-10 bg-slate-900 border border-white/10 text-white px-8 py-5 rounded-2xl shadow-2xl transition-all transform translate-y-20 opacity-0 z-[60] flex items-center gap-4">
+        <i data-lucide="shield" class="w-4 h-4 text-yellow-400"></i>
+        <span id="toast-text" class="font-bold text-sm uppercase tracking-widest font-black italic">Syncing Hub</span>
+    </div>
+
+    <script>
+        const state = {
+            currentNav: 0,
+            calendarView: 'Month',
+            jobSearch: '',
+            clientRegistry: {
+                'Global Logistics': ['Server Room A', 'Control Room', 'Warehouse Alpha'],
+                'Industrial A': ['Substation 4', 'Data Center B', 'Head Office'],
+                'Medical Centre': ['Emergency Ward', 'ICU Ward'],
+                'Retail Mall X': ['Level 1 Hub', 'Plant Room']
+            },
+            jobs: [
+                { id: 'K-2402', client: 'Global Logistics', site: 'Control Room', type: 'SANS 10139 Service', status: 'Awaiting Sign-off', tech: 'Anthony', date: '2024-04-22', po: 'PO-102' },
+                { id: 'K-2403', client: 'Industrial A', site: 'Data Center B', type: 'SANS 14520 Repair', status: 'Critical', tech: 'Lorenzo', date: '2024-04-22', po: 'PO-882' },
+                { id: 'K-2401', client: 'Global Logistics', site: 'Server Room A', type: 'SANS 14520 Service', status: 'Compliant', tech: 'Anthony', date: '2023-11-10', po: 'PO-991' },
+                { id: 'K-2404', client: 'Industrial A', site: 'Substation 4', type: 'SANS 10139 Install', status: 'Scheduled', tech: 'Unassigned', date: '2024-05-02', po: 'N/A' },
+                { id: 'K-2405', client: 'Medical Centre', site: 'ICU Ward', type: 'SANS 10139 Fault', status: 'In Progress', tech: 'Zhora', date: '2024-04-22', po: 'PO-441' }
+            ],
+            techs: [
+                { id: 'T1', name: 'Anthony', role: 'Senior Specialist', capacity: 85, status: 'On-Site', fatigue: 'Low', dutyHours: 6.2 },
+                { id: 'T2', name: 'Lorenzo', role: 'Specialist', capacity: 40, status: 'Travel', fatigue: 'Moderate', dutyHours: 12.5 }, 
+                { id: 'T3', name: 'Gert', role: 'Field Lead', capacity: 10, status: 'Office', fatigue: 'Low', dutyHours: 2.0 },
+                { id: 'T4', name: 'Zhora', role: 'Trainee Assistant', capacity: 90, status: 'On-Site', fatigue: 'High', dutyHours: 9.1 }
+            ],
+            inventory: [
+                { id: 'KH-INV-01', item: 'B7 Smoke Detectors', stock: 4, min: 10, wh: 2, van_a: 1, van_l: 1 },
+                { id: 'KH-INV-02', item: '12V 7Ah Batteries', stock: 22, min: 15, wh: 18, van_a: 2, van_l: 2 },
+                { id: 'KH-INV-03', item: 'FM200 Actuators', stock: 2, min: 3, wh: 2, van_a: 0, van_l: 0 }
+            ],
+            selectedJobAuditId: null,
+            navItems: [
+                { id: 0, title: 'Logistics Queue', icon: 'zap' },
+                { id: 1, title: 'All Job Registry', icon: 'list-checks' },
+                { id: 2, title: 'Operational Intake', icon: 'plus-circle' },
+                { id: 3, title: 'Ops Calendar', icon: 'calendar' },
+                { id: 4, title: 'Maintenance Cycles', icon: 'timer' },
+                { id: 5, title: 'Personnel Monitor', icon: 'users' },
+                { id: 6, title: 'Inventory Hub', icon: 'box' }
+            ]
+        };
+
+        function showToast(text) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-text').innerText = text;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0'), 3000);
+        }
+
+        function setNav(index) {
+            state.currentNav = index;
+            state.selectedJobAuditId = null;
+            render();
+        }
+
+        function closeModal() { document.getElementById('modal-container').classList.add('hidden'); }
+        function openModal(h) { 
+            document.getElementById('modal-content').innerHTML = h; 
+            document.getElementById('modal-container').classList.remove('hidden'); 
+            lucide.createIcons(); 
+        }
+
+        function render() {
+            const navContainer = document.getElementById('nav-items');
+            navContainer.innerHTML = state.navItems.map(item => `
+                <button onclick="setNav(${item.id})" class="w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-[11px] font-black uppercase tracking-[0.15em] transition-all ${state.currentNav === item.id ? 'sidebar-item-active shadow-lg' : 'text-white/30 hover:bg-white/5 hover:text-white/60'}">
+                    <i data-lucide="${item.icon}" class="w-4 h-4"></i>
+                    <span>${item.title}</span>
+                </button>
+            `).join('');
+
+            const activeItem = state.navItems.find(i => i.id === state.currentNav);
+            document.getElementById('current-page-crumb').innerText = activeItem.title;
+            document.getElementById('portal-title').innerText = activeItem.title;
+
+            const content = document.getElementById('content-area');
+            if (state.selectedJobAuditId) content.innerHTML = renderJobAudit(state.selectedJobAuditId);
+            else content.innerHTML = renderActiveModule();
+            
+            lucide.createIcons();
+        }
+
+        function renderActiveModule() {
+            switch(state.currentNav) {
+                case 0: return renderLogisticsQueue();
+                case 1: return renderRegistry();
+                case 2: return renderIntake();
+                case 3: return renderCalendar();
+                case 4: return renderCycles();
+                case 5: return renderPersonnel();
+                case 6: return renderInventory();
+                default: return '';
+            }
+        }
+
+        // --- 0. LOGISTICS QUEUE ---
+        function renderLogisticsQueue() {
+            const pending = state.jobs.filter(j => j.status === 'Awaiting Sign-off');
+            return `
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 animate-in">
+                    <div class="lg:col-span-8 space-y-6">
+                        <h3 class="text-xs font-black uppercase tracking-[0.3em] text-white/30 ml-2 italic">Regulatory Quality Gate</h3>
+                        <div class="bg-green-500/5 border border-green-500/10 rounded-[2.5rem] p-10 min-h-[500px] flex flex-col gap-6">
+                            ${pending.map(j => `
+                                <div class="command-card p-8 border-l-4 border-l-yellow-400">
+                                    <div class="flex justify-between items-start mb-6">
+                                        <div><h4 class="text-2xl font-black uppercase italic">${j.site}</h4><p class="text-[10px] text-white/30 font-black mt-2">Specialist: ${j.tech} • SANS Field Data Ready</p></div>
+                                        <button onclick="state.selectedJobAuditId='${j.id}';render();" class="px-4 py-1.5 rounded-full bg-yellow-400/10 text-yellow-400 text-[9px] font-black uppercase">Audit Evidence</button>
+                                    </div>
+                                    <div class="flex gap-4">
+                                        <button onclick="openApprovalModal('${j.id}')" class="flex-1 py-4 bg-white text-slate-950 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl active:scale-95 transition-all">Verify & Approve</button>
+                                        <button class="px-8 py-4 border border-white/5 bg-slate-800 rounded-2xl text-[10px] font-black uppercase text-white/30">Query Tech</button>
+                                    </div>
+                                </div>`).join('') || '<div class="m-auto opacity-10 text-center"><i data-lucide="shield-check" class="w-12 h-12 mx-auto mb-4"></i><p class="font-black uppercase text-[10px]">Queue Synchronized</p></div>'}
+                        </div>
+                    </div>
+                    <div class="lg:col-span-4 space-y-6">
+                         <h3 class="text-xs font-black uppercase tracking-[0.3em] text-white/30 ml-2 italic">Urgent P1 Deployment</h3>
+                         ${state.jobs.filter(j=>j.status==='Critical').map(j=>`
+                            <div class="command-card p-10 border-2 border-red-500/30">
+                                <p class="text-[9px] font-black text-red-500 uppercase tracking-widest mb-4 italic">Breach Response Required</p>
+                                <h4 class="text-2xl font-black italic uppercase leading-none mb-8">${j.site}</h4>
+                                <button onclick="showToast('Rerouting available units...')" class="w-full py-4 bg-yellow-400 text-slate-950 rounded-2xl font-black uppercase text-[10px]">Initialize Dispatch</button>
+                            </div>
+                         `).join('')}
+                    </div>
+                </div>`;
+        }
+
+        // --- 1. REGISTRY ---
+        function renderRegistry() {
+            return `
+                <div class="command-card p-10 animate-in">
+                    <div class="flex justify-between items-center mb-10">
+                        <h3 class="text-xl font-black italic uppercase tracking-tighter">Unified Operational Registry</h3>
+                        <input type="text" placeholder="Search Filter..." class="w-80 h-10 py-1 bg-slate-950 border-white/5 text-xs">
+                    </div>
+                    <table class="w-full text-left text-xs">
+                        <thead class="text-white/20 border-b border-white/5"><tr class="uppercase font-black tracking-widest"><th class="pb-6 px-4">ID</th><th class="pb-6">Site Engagement</th><th class="pb-6">Tech</th><th class="pb-6">Status</th></tr></thead>
+                        <tbody class="divide-y divide-white/5">
+                            ${state.jobs.map(j => `<tr><td class="py-6 px-4 font-black text-white/30">${j.id}</td><td class="py-6 font-bold text-white/80 uppercase">${j.site}<span class="block text-[9px] text-white/20 mt-1 italic font-normal">${j.client}</span></td><td class="py-6 text-white/40 font-bold uppercase">${j.tech}</td><td class="py-6"><span class="px-3 py-1.5 rounded-full text-[9px] font-black uppercase ${j.status === 'Compliant' ? 'status-compliant' : 'status-pending'}">${j.status}</span></td></tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>`;
+        }
+
+        // --- 2. INTAKE ---
+        function renderIntake() {
+            return `
+                <div class="max-w-4xl mx-auto space-y-10 animate-in">
+                    <div class="text-center"><h3 class="text-5xl font-black italic tracking-tighter uppercase italic leading-none">Operations Intake</h3><p class="text-white/20 text-sm font-medium uppercase tracking-[0.3em] mt-3">Authorize New Technical Mission</p></div>
+                    <form onsubmit="event.preventDefault(); showToast('Mission Authorized'); setNav(0);" class="command-card p-12 space-y-10 shadow-2xl">
+                        <div class="grid grid-cols-2 gap-10">
+                            <div class="space-y-3"><label class="text-[10px] font-black uppercase text-white/20 ml-1">Account Holder</label>
+                                <select onchange="updateIntakeSites(this.value)" class="h-20 font-black text-xl italic bg-slate-950 px-8 rounded-3xl w-full border border-white/5 outline-none focus:border-yellow-400 transition-colors">
+                                    <option value="">Select Account...</option>
+                                    ${Object.keys(state.clientRegistry).map(c => `<option value="${c}">${c}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div class="space-y-3"><label class="text-[10px] font-black uppercase text-white/20 ml-1">Facility Target</label>
+                                <select id="intake-sit" class="h-20 font-black text-xl italic bg-slate-950 px-8 rounded-3xl w-full border border-white/5 outline-none focus:border-yellow-400 transition-colors">
+                                    <option>Choose Client...</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-10">
+                            <div class="space-y-3"><label class="text-[10px] font-black uppercase text-white/20 ml-1">Regulatory Lead</label><select class="h-16 font-bold uppercase"><option>SANS 10139 (Detection)</option><option>SANS 14520 (Gas)</option></select></div>
+                            <div class="space-y-3"><label class="text-[10px] font-black uppercase text-white/20 ml-1">Mission Ref (PO)</label><input placeholder="PO-XXXX" class="h-16 font-black text-lg uppercase italic"></div>
+                        </div>
+                        <button type="submit" class="w-full py-8 bg-yellow-400 text-slate-950 rounded-[2.5rem] font-black uppercase text-[14px] tracking-[0.3em] shadow-2xl active:scale-95 transition-all">Generate authorized work order</button>
+                    </form>
+                </div>`;
+        }
+
+        window.updateIntakeSites = function(client) {
+            const el = document.getElementById('intake-sit');
+            el.innerHTML = state.clientRegistry[client]?.map(s => `<option value="${s}">${s}</option>`).join('') || '<option>Select...</option>';
+        };
+
+        // --- 3. CALENDAR ---
+        function renderCalendar() {
+            const views = ['Month', 'Week', 'Day'];
+            const events = [
+                { site: 'Ind. Plant A', type: 'SANS 14520', time: '08:00', tech: 'Anthony', status: 'P1' },
+                { site: 'Global Log.', type: 'SANS 10139', time: '13:30', tech: 'Lorenzo', status: 'Routine' }
+            ];
+
+            return `
+                <div class="space-y-8 animate-in pb-12">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-4xl font-black italic uppercase tracking-tighter italic">${state.calendarView} Timeline</h3>
+                        <div class="flex bg-slate-900 p-1 rounded-xl border border-white/5">
+                            ${views.map(v => `<button onclick="state.calendarView='${v}';render();" class="px-6 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${state.calendarView === v ? 'bg-yellow-400 text-slate-950 shadow-xl' : 'text-white/30'}">${v}</button>`).join('')}
+                        </div>
+                    </div>
+
+                    ${state.calendarView === 'Month' ? renderMonthView() : state.calendarView === 'Week' ? renderWeekView() : renderDayView(events)}
+                </div>`;
+        }
+
+        function renderMonthView() {
+            const days = Array.from({length: 35}, (_, i) => i - 3);
+            return `
+                <div class="calendar-grid">
+                    ${['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => `<div class="calendar-header">${d}</div>`).join('')}
+                    ${days.map(d => `
+                        <div class="calendar-day ${d < 1 || d > 30 ? 'opacity-10 pointer-events-none' : ''} ${d === 22 ? 'border-2 border-yellow-400/30' : ''}">
+                            <span class="text-xs font-black ${d === 22 ? 'text-yellow-400' : 'text-white/20'}">${d > 0 && d <= 30 ? d : ''}</span>
+                            ${d === 10 || d === 25 ? `<div class="cal-event bg-blue-500/20 text-blue-400 border border-blue-500/20">SANS Audit</div>` : ''}
+                            ${d === 22 ? `<div class="cal-event bg-red-500/20 text-red-400 border border-red-500/20">Critical Fault</div>` : ''}
+                        </div>`).join('')}
+                </div>`;
+        }
+
+        function renderWeekView() {
+            return `<div class="p-32 text-center text-white/10 italic font-black uppercase"><h3>[ Weekly Timeline View Engaged ]</h3></div>`;
+        }
+
+        function renderDayView(events) {
+            return `
+                <div class="space-y-4">
+                    ${events.map(e => `
+                        <div class="command-card p-10 flex justify-between items-center group">
+                            <div class="flex items-center gap-10">
+                                <div class="text-center w-24">
+                                    <p class="text-[9px] font-black text-white/20 uppercase mb-1">Schedule</p>
+                                    <p class="text-3xl font-black italic text-white">${e.time}</p>
+                                </div>
+                                <div class="h-12 w-[1px] bg-white/5"></div>
+                                <div>
+                                    <h4 class="text-2xl font-black uppercase italic text-white/90 leading-none mb-2">${e.site}</h4>
+                                    <p class="text-[10px] text-white/30 uppercase font-black tracking-widest">${e.type} • Lead: ${e.tech}</p>
+                                </div>
+                            </div>
+                            <span class="px-6 py-2 rounded-xl border border-white/5 bg-slate-950 text-[10px] font-black uppercase text-white/40 group-hover:text-yellow-400 transition-colors">${e.status}</span>
+                        </div>`).join('')}
+                </div>`;
+        }
+
+        // --- 4. CYCLES ---
+        function renderCycles() {
+            const cycles = [
+                { site: 'Main Server Room', type: 'SANS 14520', due: '14 Days', health: '94%' },
+                { site: 'Retail Hub B', type: 'SANS 10139', due: '22 Days', health: '82%' }
+            ];
+            return `
+                <div class="space-y-10 animate-in">
+                    <h3 class="text-4xl font-black italic uppercase tracking-tighter italic leading-none">Regulatory Lifecycles</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        ${cycles.map(c => `
+                            <div class="command-card p-10 border-l-4 border-l-blue-500 group">
+                                <div class="flex justify-between items-start mb-8">
+                                    <div><h4 class="text-2xl font-black italic uppercase">${c.site}</h4><p class="text-[10px] text-white/30 uppercase font-black mt-2">${c.type} Interval</p></div>
+                                    <span class="px-4 py-1.5 rounded-lg bg-blue-500/10 text-blue-400 font-black text-[10px]">REMAINING: ${c.due}</span>
+                                </div>
+                                <button onclick="setNav(2)" class="w-full py-4 bg-white/5 border border-white/10 rounded-2xl text-[10px] font-black uppercase hover:bg-white/10 transition-all">Queue for Deployment</button>
+                            </div>`).join('')}
+                    </div>
+                </div>`;
+        }
+
+        // --- 5. PERSONNEL (BCEA) ---
+        function renderPersonnel() {
+            return `
+                <div class="space-y-10 animate-in pb-12">
+                    <h3 class="text-4xl font-black italic uppercase tracking-tighter italic leading-none">Personnel resource monitor</h3>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        ${state.techs.map(t => {
+                            const fatiguePulse = t.dutyHours >= 12;
+                            return `
+                                <div class="command-card p-10 flex flex-col group relative overflow-hidden">
+                                    ${fatiguePulse ? `<div class="absolute top-0 right-0 p-6 opacity-20"><i data-lucide="alert-triangle" class="text-red-500 w-16 h-16"></i></div>` : ''}
+                                    <div class="flex justify-between items-start mb-8 border-b border-white/5 pb-8">
+                                        <div><h4 class="text-3xl font-black italic uppercase group-hover:text-yellow-400 transition-colors">${t.name}</h4><p class="text-[10px] text-white/30 uppercase font-black tracking-widest mt-2">${t.role}</p></div>
+                                        <div class="text-right">
+                                            <p class="text-[9px] font-black uppercase text-white/20 mb-2 italic">Duty integrity</p>
+                                            <span class="px-4 py-1.5 rounded-full text-[9px] font-black uppercase ${fatiguePulse ? 'bg-red-500 text-white animate-pulse' : 'bg-green-500/10 text-green-500'}">
+                                                ${fatiguePulse ? 'FATIGUE HALT' : 'NOMINAL PULSE'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-10">
+                                        <div>
+                                            <p class="text-[9px] font-black uppercase text-white/20 mb-3 italic">Active Duty (24h)</p>
+                                            <p class="text-5xl font-black italic ${fatiguePulse ? 'text-red-500' : 'text-white'}">${t.dutyHours}h</p>
+                                            <p class="text-[9px] text-white/20 uppercase font-bold mt-2 italic">BCEA Section 15 Limit: 12h</p>
+                                        </div>
+                                        <div>
+                                            <p class="text-[9px] font-black uppercase text-white/20 mb-2 italic italic">Site Workload</p>
+                                            <div class="capacity-bar mt-2"><div class="capacity-fill ${t.capacity > 80 ? 'bg-red-500' : 'bg-yellow-400'}" style="width: ${t.capacity}%"></div></div>
+                                            <p class="text-[10px] font-bold text-white/60 mt-4 italic">${t.capacity}% Capacity</p>
+                                        </div>
+                                    </div>
+                                </div>`;
+                        }).join('')}
+                    </div>
+                </div>`;
+        }
+
+        // --- 6. INVENTORY ---
+        function renderInventory() {
+            return `
+                <div class="space-y-10 animate-in pb-12">
+                    <div class="flex justify-between items-end"><h3 class="text-4xl font-black italic uppercase tracking-tighter">Inventory Logistics</h3><button onclick="showToast('Loading Order Frame')" class="bg-yellow-400 text-slate-950 px-10 py-4 rounded-3xl font-black uppercase text-[10px] shadow-xl">Issue Order</button></div>
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        ${state.inventory.map(item => `
+                            <div class="command-card p-12 flex flex-col justify-between border-t-4 ${item.stock < item.min ? 'border-t-red-500 animate-pulse' : 'border-t-green-500'}">
+                                <div class="flex justify-between items-start mb-10"><span class="text-[10px] font-black uppercase text-white/30 tracking-widest">${item.id}</span><i data-lucide="package" class="text-white/10"></i></div>
+                                <h4 class="text-2xl font-black italic uppercase text-white/90 leading-tight mb-10">${item.item}</h4>
+                                <div class="grid grid-cols-3 gap-2 py-6 border-y border-white/5 mb-10 text-center">
+                                    <div><p class="text-[9px] font-bold text-white/20 mb-2 uppercase">RESERVE</p><p class="font-black text-xl text-white">${item.wh}</p></div>
+                                    <div class="cursor-pointer hover:bg-white/5 rounded-xl p-1" onclick="showToast('Van A Requisition Logged')"><p class="text-[9px] font-bold text-white/20 mb-2 uppercase italic">VAN A</p><p class="font-black text-xl text-yellow-400/80">${item.van_a}</p></div>
+                                    <div class="cursor-pointer hover:bg-white/5 rounded-xl p-1" onclick="showToast('Van L Requisition Logged')"><p class="text-[9px] font-bold text-white/20 mb-2 uppercase italic">VAN L</p><p class="font-black text-xl text-yellow-400/80">${item.van_l}</p></div>
+                                </div>
+                                <div class="flex justify-between items-baseline"><div class="flex items-baseline gap-2"><span class="text-6xl font-black tracking-tighter">${item.stock}</span><span class="text-xs text-white/20 font-bold uppercase tracking-widest">Units</span></div><span class="text-[10px] text-white/20 uppercase font-black">Min: ${item.min}</span></div>
+                            </div>`).join('')}
+                    </div>
+                </div>`;
+        }
+
+        // --- SHARED: JOB AUDIT ---
+        function renderJobAudit(id) {
+            const j = state.jobs.find(x => x.id === id);
+            return `
+                <div class="space-y-10 animate-in">
+                    <button onclick="state.selectedJobAuditId = null; render();" class="flex items-center gap-2 text-[10px] font-black uppercase text-white/40 hover:text-white transition-colors"><i data-lucide="chevron-left" class="w-4 h-4"></i> Back to Rail</button>
+                    <div class="bg-slate-900 border-l-8 border-yellow-400 p-12 rounded-[2.5rem] shadow-2xl relative overflow-hidden">
+                        <div class="absolute -right-4 -top-4 p-12 opacity-5"><i data-lucide="shield-check" class="w-48 h-48"></i></div>
+                        <div class="relative z-10">
+                            <p class="text-[11px] font-black uppercase tracking-[0.4em] text-yellow-400 mb-6 italic">Regulatory Evidence Review</p>
+                            <h3 class="text-6xl font-black mb-4 tracking-tighter uppercase italic leading-none">${j.site}</h3>
+                            <p class="text-xl text-white/40 font-bold tracking-tight mb-12 uppercase italic">${j.client} • Lead Specialist: ${j.tech}</p>
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-8 border-t border-white/5 pt-12">
+                                <div class="space-y-1"><p class="text-[9px] font-black text-white/20 uppercase tracking-widest">Framework</p><p class="font-bold text-lg italic text-white/80">${j.type}</p></div>
+                                <div class="space-y-1"><p class="text-[9px] font-black text-white/20 uppercase tracking-widest">Event PO</p><p class="font-bold text-lg italic text-yellow-400">${j.po}</p></div>
+                                <div class="space-y-1"><p class="text-[9px] font-black text-white/20 uppercase tracking-widest">Registry Result</p><p class="font-bold text-lg uppercase">${j.status}</p></div>
+                                <div class="space-y-1"><p class="text-[9px] font-black text-white/20 uppercase tracking-widest">Audit Event Date</p><p class="font-bold text-lg text-white/80">${j.date}</p></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        // --- MODAL: APPROVAL ---
+        function openApprovalModal(id) {
+            const j = state.jobs.find(x => x.id === id);
+            openModal(`
+                <div class="space-y-10 text-white animate-in">
+                    <div class="flex justify-between items-start"><div><h3 class="text-4xl font-black italic tracking-tighter uppercase leading-none italic">Quality Assurance Gate</h3><p class="text-[11px] text-white/30 uppercase font-black mt-4 tracking-widest italic">Reviewing: ${j.site}</p></div><i data-lucide="check-square" class="w-16 h-16 text-green-500 opacity-20"></i></div>
+                    <div class="bg-slate-950/80 p-10 rounded-[2.5rem] border border-white/5 space-y-4">
+                        <label class="flex items-center gap-5 cursor-pointer group p-4 bg-slate-900 rounded-2xl border border-white/5 hover:border-green-500/20 transition-all"><input type="checkbox" class="w-6 h-6 rounded accent-green-500"><span class="text-sm font-bold text-white/60 group-hover:text-white uppercase italic">SANS Clause 13: Zone Integrity Verified</span></label>
+                        <label class="flex items-center gap-5 cursor-pointer group p-4 bg-slate-900 rounded-2xl border border-white/5 hover:border-green-500/20 transition-all"><input type="checkbox" class="w-6 h-6 rounded accent-green-500"><span class="text-sm font-bold text-white/60 group-hover:text-white uppercase italic">SANS Clause 16: Audibility > 65dB Verified</span></label>
+                        <label class="flex items-center gap-5 cursor-pointer group p-4 bg-slate-900 rounded-2xl border border-white/5 hover:border-green-500/20 transition-all"><input type="checkbox" class="w-6 h-6 rounded accent-green-500"><span class="text-sm font-bold text-white/60 group-hover:text-white uppercase italic">SANS Clause 45: Standby Battery Verification Complete</span></label>
+                        <label class="flex items-center gap-5 cursor-pointer group p-4 bg-slate-900 rounded-2xl border border-white/5 hover:border-green-500/20 transition-all"><input type="checkbox" class="w-6 h-6 rounded accent-green-500"><span class="text-sm font-bold text-white/60 group-hover:text-white uppercase italic">Folder 11 Client Sign-off Secure</span></label>
+                    </div>
+                    <div class="flex gap-6"><button onclick="closeModal()" class="flex-1 py-6 bg-slate-800 border border-white/10 rounded-3xl font-black uppercase text-[12px] tracking-widest">Defer Approval</button><button onclick="approveJob('${id}')" class="flex-1 py-6 bg-yellow-400 text-slate-950 rounded-3xl font-black uppercase text-[12px] tracking-widest shadow-2xl active:scale-95 transition-all">Release SANS Cert</button></div>
+                </div>`);
+        }
+
+        function approveJob(id) {
+            const j = state.jobs.find(x => x.id === id);
+            if(j) { j.status = 'Compliant'; showToast('Compliance Released'); closeModal(); render(); }
+        }
+
+        window.onload = render;
+    </script>
+</body>
+</html>

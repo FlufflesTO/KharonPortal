@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kharon Command - Business Oversight</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        
+        :root {
+            --slate-950: #020617;
+            --slate-900: #0f172a;
+            --slate-800: #1e293b;
+            --kharon-gold: #facc15;
+        }
+
+        body { 
+            font-family: 'Inter', sans-serif; 
+            margin: 0; 
+            background-color: var(--slate-950); 
+            color: #f1f5f9;
+        }
+
+        .animate-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .sidebar-item-active { 
+            background-color: rgba(255, 255, 255, 0.05); 
+            color: var(--kharon-gold); 
+            border-left: 4px solid var(--kharon-gold); 
+        }
+
+        .command-card {
+            background-color: var(--slate-900);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 1rem;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .command-card:hover {
+            border-color: rgba(250, 204, 21, 0.3);
+            transform: translateY(-2px);
+            background-color: #161e2e;
+        }
+
+        .modal-bg { background-color: rgba(2, 6, 23, 0.95); backdrop-filter: blur(12px); }
+        
+        input, select, textarea { 
+            outline: none; 
+            border: 1px solid rgba(255, 255, 255, 0.1); 
+            border-radius: 0.75rem; 
+            padding: 1rem; 
+            width: 100%; 
+            background-color: var(--slate-800);
+            color: white;
+            font-size: 14px;
+        }
+        
+        input:focus { border-color: var(--kharon-gold); }
+
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: var(--slate-950); }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+
+        .status-compliant { background: rgba(34, 197, 94, 0.1); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.2); }
+        .status-critical { background: rgba(239, 68, 68, 0.1); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.2); animation: pulse-red 2s infinite; }
+        .status-pending { background: rgba(250, 204, 21, 0.1); color: #facc15; border: 1px solid rgba(250, 204, 21, 0.2); }
+        @keyframes pulse-red { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+    </style>
+</head>
+<body class="h-screen overflow-hidden">
+    <div id="app" class="flex h-screen">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="w-80 bg-slate-900 border-r border-white/5 flex flex-col p-6 z-20 shadow-2xl overflow-y-auto">
+            <div class="flex items-center gap-4 mb-10 pb-8 border-b border-white/5">
+                <div class="w-12 h-12 bg-yellow-400 rounded-2xl flex items-center justify-center text-slate-950 shadow-lg shadow-yellow-400/20">
+                    <i data-lucide="shield" class="w-7 h-7"></i>
+                </div>
+                <div>
+                    <h1 class="font-black tracking-tighter text-xl uppercase leading-none text-white">Kharon</h1>
+                    <p class="text-[10px] uppercase tracking-[0.2em] text-white/30 font-bold mt-1 text-white/40">Oversight Command</p>
+                </div>
+            </div>
+
+            <nav id="nav-items" class="flex-1 space-y-2 pr-2"></nav>
+
+            <div class="pt-6 border-t border-white/5 space-y-4 text-white/40">
+                <div class="flex items-center justify-between text-[10px] font-black uppercase tracking-widest">
+                    <span>SANS Integrity hub</span>
+                    <span id="compliance-pct" class="text-yellow-400 font-black text-xs">85%</span>
+                </div>
+                <div class="h-2 bg-slate-800 rounded-full overflow-hidden">
+                    <div id="compliance-bar" class="h-full bg-green-500 transition-all duration-1000"></div>
+                </div>
+                <button onclick="window.location.reload()" class="w-full py-4 bg-white/5 rounded-xl text-[10px] font-black uppercase tracking-widest text-white/40 hover:bg-red-500/10 hover:text-red-400 transition-all border border-white/5">Sign Out Session</button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 overflow-y-auto bg-slate-950 relative">
+            <header class="sticky top-0 z-10 bg-slate-950/90 backdrop-blur-xl px-10 py-8 border-b border-white/5 flex justify-between items-center">
+                <div>
+                    <div id="breadcrumb" class="text-[10px] text-white/20 uppercase tracking-[0.3em] font-black mb-1 flex items-center gap-2">
+                        <span>Admin Oversight</span> <i data-lucide="chevron-right" class="w-3 h-3"></i> <span id="current-page-crumb">Dashboard</span>
+                    </div>
+                    <h2 id="portal-title" class="text-3xl font-black text-white tracking-tighter italic uppercase">Registry</h2>
+                </div>
+                <div class="flex items-center gap-6">
+                    <div class="text-right">
+                        <p class="text-xs font-black text-white leading-none mb-1 font-bold italic italic">Kharon Command</p>
+                        <p id="user-role-label" class="text-[10px] text-white/30 font-bold uppercase tracking-widest">Platform Manager</p>
+                    </div>
+                    <div class="w-12 h-12 rounded-2xl bg-slate-900 flex items-center justify-center font-black text-yellow-400 border border-white/10 shadow-inner">C</div>
+                </div>
+            </header>
+
+            <div id="content-area" class="p-10 animate-in"></div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="modal-container" class="fixed inset-0 z-50 flex items-center justify-center hidden p-6">
+        <div class="modal-bg absolute inset-0" onclick="closeModal()"></div>
+        <div class="bg-slate-900 border border-white/10 rounded-[2rem] w-full max-w-2xl p-10 relative shadow-2xl animate-in overflow-y-auto max-h-[90vh]" id="modal-content"></div>
+    </div>
+
+    <div id="toast" class="fixed bottom-10 right-10 bg-slate-900 border border-white/10 text-white px-8 py-5 rounded-2xl shadow-2xl transition-all transform translate-y-20 opacity-0 z-[60] flex items-center gap-4">
+        <i data-lucide="shield" class="w-4 h-4 text-yellow-400"></i>
+        <span id="toast-text" class="font-bold text-sm uppercase tracking-widest font-black italic">Sync Successful</span>
+    </div>
+
+    <script>
+        const state = {
+            clientRegistry: {
+                'Global Logistics': ['Server Room A', 'Control Room', 'Warehouse Alpha'],
+                'Industrial A': ['Substation 4', 'Data Center B', 'Head Office'],
+                'Medical Centre': ['Emergency Ward', 'ICU Ward', 'Data Suite'],
+                'Tech Park B': ['Archives', 'Loading Dock']
+            },
+            jobs: [
+                { id: 'K-2401', client: 'Global Logistics', site: 'Server Room A', type: 'SANS 14520 Gas', status: 'Compliant', tech: 'Anthony', val: 4200, date: '2023-11-10', invoiced: true, po: 'PO-991' },
+                { id: 'K-2402', client: 'Global Logistics', site: 'Control Room', type: 'SANS 10139 Detect', status: 'Awaiting Sign-off', tech: 'Anthony', val: 1850, date: '2024-04-22', invoiced: false, po: 'PO-102' },
+                { id: 'K-2403', client: 'Industrial A', site: 'Data Center B', type: 'SANS 14520 Gas', status: 'Critical', tech: 'Lorenzo', val: 12500, date: '2022-10-15', invoiced: true, po: 'PO-882' },
+                { id: 'K-2404', client: 'Industrial A', site: 'Substation 4', type: 'SANS 10139 Detect', status: 'Scheduled', tech: 'Unassigned', val: 3300, date: '2023-08-05', invoiced: false, po: 'N/A' },
+                { id: 'K-2405', client: 'Tech Park B', site: 'Archives', type: 'SANS 14520 Gas', status: 'Scheduled', tech: 'Lorenzo', val: 2100, date: '2023-09-12', invoiced: false, po: 'PO-441' }
+            ],
+            staff: [
+                { name: 'Anthony', role: 'Senior Specialist', sans10139: 'Active', sans14520: 'Active', medical: '2024-12-15', wellness: 'Stable', incidents: 0 },
+                { name: 'Lorenzo', role: 'Technician', sans10139: 'Active', sans14520: 'Expiring', medical: '2024-06-10', wellness: 'Fatigued', incidents: 2 },
+                { name: 'Gert', role: 'Field Lead', sans10139: 'Active', sans14520: 'Active', medical: '2025-01-20', wellness: 'Stable', incidents: 0 },
+                { name: 'Zhora', role: 'Assistant / Trainee', sans10139: 'Training', sans14520: 'N/A', medical: '2025-03-12', wellness: 'Excellent', incidents: 0 }
+            ],
+            inventory: [
+                { item: 'B7 Smoke Detectors', stock: 4, min: 10, warehouse: 2, van_anthony: 1, van_lorenzo: 1 },
+                { item: '12V 7Ah Batteries', stock: 22, min: 15, warehouse: 18, van_anthony: 2, van_lorenzo: 2 },
+                { item: 'FM200 Discharge Nozzles', stock: 2, min: 5, warehouse: 2, van_anthony: 0, van_lorenzo: 0 }
+            ],
+            currentNav: 0,
+            selectedJobId: null,
+            jobSearch: '',
+            calendarView: 'Week'
+        };
+
+        const navItems = [
+            { title: 'Business Pulse', icon: 'activity', group: 'Oversight' },
+            { title: 'Personnel Integrity', icon: 'users', group: 'Oversight' },
+            { title: 'Corporate Registry', icon: 'clipboard-list', group: 'Oversight' },
+            { title: 'Regulatory Vault', icon: 'file-lock', group: 'Oversight' },
+            { title: 'HSE Audit Hub', icon: 'shield-alert', group: 'Oversight' },
+            { title: 'Logistics Queue', icon: 'zap', group: 'Operations' },
+            { title: 'Job Dispatcher', icon: 'plus-circle', group: 'Operations' },
+            { title: 'Unified Calendar', icon: 'calendar', group: 'Operations' },
+            { title: 'Inventory Command', icon: 'box', group: 'Operations' }
+        ];
+
+        function showToast(text) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-text').innerText = text;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0'), 3000);
+        }
+
+        function setNav(index) {
+            state.currentNav = index;
+            state.selectedJobId = null;
+            render();
+        }
+
+        function closeModal() { document.getElementById('modal-container').classList.add('hidden'); }
+
+        function openJobDetail(id) { state.selectedJobId = id; render(); }
+
+        function render() {
+            const currentItem = navItems[state.currentNav];
+            document.getElementById('portal-title').innerText = state.selectedJobId ? "Technical Audit" : currentItem.title;
+            document.getElementById('current-page-crumb').innerText = state.selectedJobId ? "Deep Audit" : currentItem.title;
+
+            // Nav Menu with Groups
+            document.getElementById('nav-items').innerHTML = navItems.map((item, i) => `
+                ${(i === 0 || navItems[i-1].group !== item.group) ? `<p class="text-[9px] font-black uppercase text-white/20 mt-6 mb-2 px-5 tracking-widest">${item.group}</p>` : ''}
+                <button onclick="setNav(${i})" class="w-full flex items-center justify-between px-5 py-3.5 rounded-2xl text-[11px] font-black uppercase tracking-[0.15em] transition-all ${state.currentNav === i ? 'sidebar-item-active shadow-lg' : 'text-white/30 hover:bg-white/5 hover:text-white/60'}">
+                    <div class="flex items-center gap-4"><i data-lucide="${item.icon}" class="w-4 h-4"></i><span>${item.title}</span></div>
+                </button>
+            `).join('');
+
+            // Compliance Pulse
+            const compliant = state.jobs.filter(j => j.status === 'Compliant').length;
+            const pct = Math.round((compliant / state.jobs.length) * 100);
+            document.getElementById('compliance-pct').innerText = pct + '%';
+            document.getElementById('compliance-bar').style.width = pct + '%';
+
+            const content = document.getElementById('content-area');
+            if (state.selectedJobId) content.innerHTML = renderJobAudit(state.selectedJobId);
+            else content.innerHTML = renderModule(state.currentNav);
+            
+            lucide.createIcons();
+        }
+
+        function renderModule(navIndex) {
+            switch(navIndex) {
+                case 0: return renderBusinessPulse();
+                case 1: return renderStaffRegistry();
+                case 2: return renderOperationsRail();
+                case 3: return renderVault();
+                case 4: return renderHSEHub();
+                case 5: return renderLogisticsQueue();
+                case 6: return renderNewJobLoader();
+                case 7: return renderCalendar();
+                case 8: return renderInventory();
+                default: return '';
+            }
+        }
+
+        // --- OVERVIEW: BUSINESS PULSE ---
+        function renderBusinessPulse() {
+            const totalRevenue = state.jobs.reduce((acc, curr) => acc + curr.val, 0);
+            const billedRevenue = state.jobs.filter(j => j.invoiced).reduce((acc, curr) => acc + curr.val, 0);
+            return `
+                <div class="space-y-10 animate-in">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        ${renderStat('Workbook Valuation', 'R' + totalRevenue.toLocaleString(), 'banknote', 'text-yellow-400')}
+                        ${renderStat('Invoiced (Booked)', 'R' + billedRevenue.toLocaleString(), 'check-circle', 'text-green-500')}
+                        ${renderStat('WIP Revenue Gap', 'R' + (totalRevenue - billedRevenue).toLocaleString(), 'trending-down', 'text-red-400')}
+                        ${renderStat('Field Sentiment', 'Concern', 'heart', 'text-blue-400')}
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                        <div class="command-card p-10">
+                            <h3 class="text-xs font-black uppercase tracking-widest text-white/30 mb-8 italic">Managerial Alerts</h3>
+                            <div class="space-y-4">
+                                <div class="p-6 bg-red-500/5 border border-red-500/10 rounded-2xl flex items-center justify-between">
+                                    <div><p class="font-bold text-red-400">Critical: SANS 14520 Breach</p><p class="text-[10px] text-white/20 uppercase mt-1">Data Center B • 18 Months since last service</p></div>
+                                    <button onclick="setNav(5)" class="px-6 py-2 bg-red-500 text-white rounded-xl text-[9px] font-black uppercase">Dispatch</button>
+                                </div>
+                                <div class="p-6 bg-blue-500/5 border border-blue-500/10 rounded-2xl flex items-center justify-between">
+                                    <div><p class="font-bold text-blue-400">Personnel: Fatigue Indicator</p><p class="text-[10px] text-white/20 uppercase mt-1">Lorenzo • 2 Near-Miss incidents reported</p></div>
+                                    <button onclick="setNav(1)" class="px-6 py-2 bg-blue-500 text-white rounded-xl text-[9px] font-black uppercase">Wellness</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="command-card p-10 flex flex-col justify-center text-center space-y-6">
+                            <i data-lucide="shield-check" class="w-16 h-16 text-yellow-400/20 mx-auto"></i>
+                            <h4 class="font-black text-2xl uppercase italic tracking-tighter">Liability Shield Active</h4>
+                            <p class="text-sm text-white/40 max-w-xs mx-auto">Every SANS certificate issued in the last 30 days is cross-referenced with Folder 06 evidence.</p>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        // --- OVERSIGHT: STAFF REGISTRY ---
+        function renderStaffRegistry() {
+            return `
+                <div class="space-y-10 animate-in max-w-5xl mx-auto">
+                    <h3 class="text-4xl font-black italic uppercase tracking-tighter">Personnel Wellness & Competency</h3>
+                    <div class="grid grid-cols-1 gap-6">
+                        ${state.staff.map(p => `
+                            <div class="command-card p-10 flex items-center justify-between group relative overflow-hidden">
+                                <div class="absolute right-0 top-0 h-full w-1.5 ${p.wellness === 'Fatigued' ? 'bg-red-500 shadow-[0_0_15px_red]' : 'bg-green-500'}"></div>
+                                <div class="flex items-center gap-10">
+                                    <div class="w-24 h-24 bg-slate-800 rounded-[2.5rem] flex items-center justify-center font-black text-white/10 text-4xl group-hover:bg-kharon-gold group-hover:text-slate-950 transition-all">${p.name.charAt(0)}</div>
+                                    <div>
+                                        <h4 class="text-3xl font-black italic tracking-tighter uppercase mb-1">${p.name}</h4>
+                                        <p class="text-[10px] text-white/40 font-bold uppercase tracking-[0.3em]">${p.role}</p>
+                                        <div class="flex gap-4 mt-6">
+                                            <span class="px-3 py-1 rounded-lg text-[9px] font-black uppercase ${p.wellness === 'Fatigued' ? 'bg-red-500/10 text-red-400' : 'bg-green-500/10 text-green-500'}">Pulse: ${p.wellness}</span>
+                                            <span class="px-3 py-1 rounded-lg text-[9px] font-black uppercase bg-white/5 text-white/30">Medical: ${p.medical}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex gap-12 border-l border-white/5 pl-12">
+                                    <div class="text-center"><p class="text-[9px] font-black text-white/20 uppercase tracking-widest mb-1">SANS 10139</p><span class="text-[10px] font-bold text-green-500">${p.sans10139}</span></div>
+                                    <div class="text-center"><p class="text-[9px] font-black text-white/20 uppercase tracking-widest mb-1">SANS 14520</p><span class="text-[10px] font-bold ${p.sans14520 === 'Expiring' ? 'text-yellow-400' : 'text-green-500'}">${p.sans14520}</span></div>
+                                </div>
+                                <button class="p-4 bg-white/5 border border-white/10 rounded-2xl text-white/20 hover:text-white transition-all"><i data-lucide="brain"></i></button>
+                            </div>`).join('')}
+                    </div>
+                </div>`;
+        }
+
+        // --- OPERATIONS: LOGISTICS QUEUE ---
+        function renderLogisticsQueue() {
+            const pending = state.jobs.filter(j => j.status === 'Awaiting Sign-off');
+            return `
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-10 animate-in">
+                    <div class="space-y-6">
+                        <h3 class="text-xs font-black uppercase tracking-widest text-white/30 ml-2">Job Completion Gate</h3>
+                        <div class="bg-green-500/5 border border-green-500/10 rounded-[2.5rem] p-10 min-h-[450px] flex flex-col gap-6">
+                            ${pending.length > 0 ? pending.map(j => `
+                                <div class="command-card p-8 border-l-4 border-l-yellow-400">
+                                    <h4 class="font-black text-2xl tracking-tighter uppercase italic">${j.site}</h4>
+                                    <p class="text-[10px] text-white/30 uppercase font-black mt-2">Specialist: ${j.tech} • SANS Deliverables Ready</p>
+                                    <div class="flex gap-4 mt-8">
+                                        <button onclick="approveJob('${j.id}')" class="flex-1 py-4 bg-white text-slate-950 rounded-2xl font-black uppercase text-xs tracking-widest">Verify & Sign-off</button>
+                                        <button class="px-8 py-4 border border-white/5 bg-slate-800 rounded-2xl text-[10px] font-black uppercase text-white/30">Query Tech</button>
+                                    </div>
+                                </div>`).join('') : '<div class="m-auto opacity-10 flex flex-col items-center gap-4"><i data-lucide="shield-check" class="w-12 h-12"></i><p class="font-black uppercase text-[10px] tracking-[0.4em]">Zero Pending sign-offs</p></div>'}
+                        </div>
+                    </div>
+                    <div class="space-y-6">
+                        <h3 class="text-xs font-black uppercase tracking-widest text-white/30 ml-2">Priority Dispatch Rail</h3>
+                        ${state.jobs.filter(j => j.status === 'Critical').map(j => `
+                            <div class="command-card p-10 border-2 border-red-500/20 shadow-2xl relative overflow-hidden group">
+                                <div class="absolute -right-4 -top-4 p-10 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity"><i data-lucide="alert-octagon" class="w-32 h-32"></i></div>
+                                <p class="text-[10px] font-black text-red-500 uppercase mb-4 tracking-[0.3em] animate-pulse">Critical SANS Violation</p>
+                                <h4 class="text-3xl font-black tracking-tighter leading-none mb-4 italic">${j.site}</h4>
+                                <div class="grid grid-cols-2 gap-4 mt-10">
+                                    <button onclick="showToast('Assigned Anthony')" class="py-4 bg-yellow-400 text-slate-950 rounded-2xl font-black uppercase text-[10px]">Dispatch Anthony</button>
+                                    <button onclick="showToast('Assigned Lorenzo')" class="py-4 bg-slate-900 border border-white/10 text-white rounded-2xl font-black uppercase text-[10px]">Dispatch Lorenzo</button>
+                                </div>
+                            </div>`).join('')}
+                    </div>
+                </div>`;
+        }
+
+        // --- OPERATIONS: NEW JOB LOADER (DUAL DROPDOWN) ---
+        function renderNewJobLoader() {
+            return `
+                <div class="max-w-4xl mx-auto space-y-10 animate-in">
+                    <div class="text-center mb-10"><h3 class="text-5xl font-black italic tracking-tighter uppercase">Operational Intake</h3></div>
+                    <form onsubmit="event.preventDefault(); showToast('Work Order Created'); setNav(2);" class="command-card p-12 space-y-8 shadow-2xl">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div class="space-y-3"><label class="text-[10px] font-black uppercase text-white/20 ml-1 tracking-widest">Target Client</label>
+                                <select id="client-sel" onchange="updateSiteDropdown(this.value)" class="h-16 font-bold">
+                                    <option value="">Select Client...</option>
+                                    ${Object.keys(state.clientRegistry).map(c => `<option value="${c}">${c}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div class="space-y-3"><label class="text-[10px] font-black uppercase text-white/20 ml-1 tracking-widest">Site Facility</label><select id="site-sel" class="h-16 font-bold"><option>Select Client First...</option></select></div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div class="space-y-3"><label class="text-[10px] font-black uppercase text-white/20 ml-1 tracking-widest">Regulatory Framework</label><select class="h-16 font-bold"><option>SANS 10139 (Detection)</option><option>SANS 14520 (Gas)</option></select></div>
+                            <div class="space-y-3"><label class="text-[10px] font-black uppercase text-white/20 ml-1 tracking-widest">Engagement Scope</label><select class="h-16 font-bold"><option>Annual Service</option><option>Fault Finding</option><option>Commissioning</option><option>Emergency Repair</option></select></div>
+                        </div>
+                        <button type="submit" class="w-full py-6 bg-yellow-400 text-slate-950 rounded-2xl font-black uppercase text-sm shadow-xl active:scale-[0.98] transition-all">Generate Work Order</button>
+                    </form>
+                </div>`;
+        }
+
+        window.updateSiteDropdown = function(client) {
+            const el = document.getElementById('site-sel');
+            el.innerHTML = state.clientRegistry[client]?.map(s => `<option value="${s}">${s}</option>`).join('') || '<option>Select Client...</option>';
+        };
+
+        // --- SHARED: JOB AUDIT VIEW ---
+        function renderJobAudit(id) {
+            const j = state.jobs.find(x => x.id === id);
+            return `
+                <div class="space-y-10 animate-in">
+                    <button onclick="state.selectedJobId = null; render();" class="flex items-center gap-2 text-[10px] font-black uppercase text-white/40 hover:text-white transition-colors"><i data-lucide="chevron-left" class="w-4 h-4"></i> Back to Rail</button>
+                    <div class="bg-slate-900 border-l-8 border-yellow-400 p-12 rounded-[2.5rem] shadow-2xl relative overflow-hidden">
+                        <div class="relative z-10">
+                            <p class="text-[10px] font-black uppercase tracking-widest text-yellow-400 mb-2 italic">Intelligence Profile: Engagements</p>
+                            <h3 class="text-5xl font-black mb-4 tracking-tighter uppercase italic">${j.site}</h3>
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-8 mt-12 pt-12 border-t border-white/5">
+                                <div class="space-y-1"><p class="text-[9px] font-black text-white/20 uppercase tracking-widest">Lead Tech</p><p class="font-bold text-lg text-white/80">${j.tech}</p></div>
+                                <div class="space-y-1"><p class="text-[9px] font-black text-white/20 uppercase tracking-widest">Revenue (Projected)</p><p class="font-bold text-lg text-green-500">R${j.val.toLocaleString()}</p></div>
+                                <div class="space-y-1"><p class="text-[9px] font-black text-white/20 uppercase tracking-widest">Billing Reality</p><p class="font-bold text-lg ${j.invoiced ? 'text-green-500' : 'text-yellow-400'}">${j.invoiced ? 'Invoiced' : 'WIP'}</p></div>
+                                <div class="space-y-1"><p class="text-[9px] font-black text-white/20 uppercase tracking-widest">Audit Status</p><p class="font-bold text-lg text-white/80">${j.status}</p></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        // --- STUBS & UTILS ---
+        function renderOperationsRail() { return `<div class="command-card p-10"><h3 class="text-xl font-black italic uppercase mb-10">Master operationalRegistry</h3><table class="w-full text-left text-xs"><thead class="text-white/20 border-b border-white/5"><tr class="uppercase font-black tracking-widest"><th class="pb-6 px-4">ID</th><th class="pb-6">Client / Site</th><th class="pb-6">Value</th><th class="pb-6">Outcome</th></tr></thead><tbody class="divide-y divide-white/5">${state.jobs.map(j => `<tr onclick="openJobDetail('${j.id}')" class="hover:bg-white/5 cursor-pointer"><td>${j.id}</td><td class="py-6 font-bold text-white/80">${j.site}</td><td>R${j.val.toLocaleString()}</td><td><span class="px-3 py-1 rounded-full ${j.status === 'Compliant' ? 'status-compliant' : 'status-pending'}">${j.status}</span></td></tr>`).join('')}</tbody></table></div>`; }
+        function renderVault() { return `<div class="space-y-10"><h3 class="text-2xl font-black italic uppercase tracking-tighter">Regulatory Vault (Folder 14)</h3><div class="grid grid-cols-1 md:grid-cols-2 gap-6">${state.jobs.filter(j=>j.status === 'Compliant').map(j => `<div class="command-card p-10 flex items-center gap-8 border-l-4 border-l-green-500"><i data-lucide="file-lock" class="w-10 h-10 text-green-500"></i><div><h4 class="font-black text-2xl tracking-tighter uppercase">${j.site}</h4><p class="text-[10px] text-white/30 uppercase mt-2 font-black">Trace ID: ${j.id}</p></div></div>`).join('')}</div></div>`; }
+        function renderHSEHub() { return `<div class="p-32 text-center text-white/10 italic font-black uppercase tracking-widest"><h3>[ Accessing HSE Sentinel (Folder 04)... ]</h3></div>`; }
+        function renderInventory() { return `<div class="p-32 text-center text-white/10 italic font-black uppercase tracking-widest"><h3>[ Accessing Stock Engine (Folder 10)... ]</h3></div>`; }
+        function renderCalendar() { return `<div class="p-32 text-center text-white/10 italic font-black uppercase tracking-widest"><h3>[ Company Scheduling Matrix... ]</h3></div>`; }
+        function renderStat(label, val, icon, color) { return `<div class="command-card p-10 flex flex-col justify-between group"><div class="flex justify-between items-start mb-10 text-[10px] font-black uppercase text-white/20 tracking-widest"><span>${label}</span><i data-lucide="${icon}" class="w-5 h-5 ${color}"></i></div><p class="text-4xl font-black tracking-tighter text-white group-hover:scale-105 transition-all">${val}</p></div>`; }
+        function approveJob(id) { const j = state.jobs.find(x=>x.id===id); if(j){ j.status = 'Compliant'; j.cert = 'CER-AUTO-' + Math.floor(Math.random()*999); showToast('Job Authorized. SANS Certificate Issued.'); render(); } }
+
+        window.onload = render;
+    </script>
+</body>
+</html>

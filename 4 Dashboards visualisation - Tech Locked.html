@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kharon Field Operations - Technician Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        
+        :root {
+            --slate-950: #020617;
+            --slate-900: #0f172a;
+            --slate-800: #1e293b;
+            --kharon-gold: #facc15;
+        }
+
+        body { 
+            font-family: 'Inter', sans-serif; 
+            margin: 0; 
+            background-color: var(--slate-950); 
+            color: #f1f5f9;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .animate-in { animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .sidebar-item-active { 
+            background-color: rgba(255, 255, 255, 0.05); 
+            color: var(--kharon-gold); 
+            border-left: 4px solid var(--kharon-gold); 
+        }
+
+        .command-card {
+            background-color: var(--slate-900);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 1.25rem;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .command-card:hover {
+            border-color: rgba(250, 204, 21, 0.3);
+            transform: translateY(-2px);
+            background-color: #161e2e;
+        }
+
+        .modal-bg { background-color: rgba(2, 6, 23, 0.98); backdrop-filter: blur(16px); }
+        
+        input, select, textarea { 
+            outline: none; 
+            border: 1px solid rgba(255, 255, 255, 0.1); 
+            border-radius: 0.75rem; 
+            padding: 1rem; 
+            width: 100%; 
+            background-color: var(--slate-800);
+            color: white;
+            font-size: 16px;
+        }
+        
+        input:focus { border-color: var(--kharon-gold); }
+
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: var(--slate-950); }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+
+        .btn-primary {
+            background-color: var(--kharon-gold);
+            color: var(--slate-950);
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-radius: 1rem;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary:active { transform: scale(0.96); }
+
+        .signature-pad {
+            border: 2px dashed rgba(255, 255, 255, 0.1);
+            background: var(--slate-950);
+            height: 100px;
+            border-radius: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: rgba(255,255,255,0.2);
+            font-size: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .device-row:nth-child(even) { background: rgba(255,255,255,0.02); }
+        
+        .summary-block {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 1.5rem;
+            border-radius: 1.5rem;
+        }
+
+        .sans-section-header {
+            font-size: 10px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            color: var(--kharon-gold);
+            opacity: 0.8;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+    </style>
+</head>
+<body class="h-screen overflow-hidden">
+    <div id="app" class="flex h-screen">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="w-72 bg-slate-900 border-r border-white/5 flex flex-col p-6 z-20 shadow-2xl overflow-y-auto">
+            <div class="flex items-center gap-4 mb-10 pb-8 border-b border-white/5">
+                <div class="w-12 h-12 bg-yellow-400 rounded-2xl flex items-center justify-center text-slate-950 shadow-lg shadow-yellow-400/20">
+                    <i data-lucide="user-check"></i>
+                </div>
+                <div>
+                    <h1 class="font-black tracking-tighter text-xl uppercase leading-none text-white">Kharon</h1>
+                    <p class="text-[10px] uppercase tracking-[0.2em] text-white/30 font-bold mt-1">Field Intelligence</p>
+                </div>
+            </div>
+
+            <nav id="nav-items" class="flex-1 space-y-2 pr-2">
+                <button onclick="setNav(0)" id="nav-0" class="w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-[11px] font-black uppercase tracking-[0.15em] sidebar-item-active shadow-lg transition-all">
+                    <i data-lucide="briefcase" class="w-4 h-4"></i>
+                    <span>My Work Orders</span>
+                </button>
+                <button onclick="setNav(1)" id="nav-1" class="w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-[11px] font-black uppercase tracking-[0.15em] text-white/30 hover:bg-white/5 transition-all">
+                    <i data-lucide="book-open" class="w-4 h-4"></i>
+                    <span>Technical SOPs</span>
+                </button>
+                <button onclick="setNav(2)" id="nav-2" class="w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-[11px] font-black uppercase tracking-[0.15em] text-white/30 hover:bg-white/5 transition-all">
+                    <i data-lucide="map-pin" class="w-4 h-4"></i>
+                    <span>Site Layouts</span>
+                </button>
+                <button onclick="setNav(3)" id="nav-3" class="w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-[11px] font-black uppercase tracking-[0.15em] text-white/30 hover:bg-white/5 transition-all">
+                    <i data-lucide="box" class="w-4 h-4"></i>
+                    <span>Van Stock</span>
+                </button>
+            </nav>
+
+            <div class="pt-6 border-t border-white/5 space-y-4">
+                <div class="flex items-center justify-between text-[10px] font-black uppercase text-white/20">
+                    <span>Identity Status</span>
+                    <span class="text-green-500">AUTHENTICATED</span>
+                </div>
+                <button onclick="window.location.reload()" class="w-full py-4 bg-white/5 rounded-xl text-[10px] font-black uppercase tracking-widest text-white/40 hover:bg-red-500/10 hover:text-red-400 transition-all border border-white/5">End Shift</button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 overflow-y-auto bg-slate-950 relative">
+            <header class="sticky top-0 z-10 bg-slate-950/90 backdrop-blur-xl px-10 py-8 border-b border-white/5 flex justify-between items-center">
+                <div>
+                    <div class="text-[10px] text-white/20 uppercase tracking-[0.3em] font-black mb-1 flex items-center gap-2">
+                        <span>Terminal 01</span> <i data-lucide="chevron-right" class="w-3 h-3"></i> <span id="current-page-crumb">My Schedule</span>
+                    </div>
+                    <h2 id="portal-title" class="text-3xl font-black text-white tracking-tighter italic uppercase">Command Registry</h2>
+                </div>
+                <div class="flex items-center gap-6">
+                    <div class="text-right">
+                        <p class="text-xs font-black text-white leading-none mb-1 font-bold italic">Anthony</p>
+                        <p class="text-[10px] text-white/30 font-bold uppercase tracking-widest">Specialist Technician</p>
+                    </div>
+                    <div class="w-12 h-12 rounded-2xl bg-slate-900 flex items-center justify-center font-black text-yellow-400 border border-white/10 shadow-inner">A</div>
+                </div>
+            </header>
+
+            <div id="content-area" class="p-10 animate-in"></div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="modal-container" class="fixed inset-0 z-50 flex items-center justify-center hidden p-6">
+        <div class="modal-bg absolute inset-0" onclick="closeModal()"></div>
+        <div class="bg-slate-900 border border-white/10 rounded-[2.5rem] w-full max-w-5xl p-10 relative shadow-2xl animate-in overflow-y-auto max-h-[95vh]" id="modal-content"></div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-10 right-10 bg-slate-900 border border-white/10 text-white px-8 py-5 rounded-2xl shadow-2xl transition-all transform translate-y-20 opacity-0 z-[60] flex items-center gap-4">
+        <i data-lucide="shield" class="w-4 h-4 text-yellow-400"></i>
+        <span id="toast-text" class="font-bold text-sm uppercase tracking-widest font-black italic">Success</span>
+    </div>
+
+    <script>
+        const state = {
+            currentNav: 0,
+            activeJobId: 'K-2402',
+            safetyVerified: false,
+            laborState: 'idle', 
+            workStartTime: null,
+            jobs: [
+                { 
+                    id: 'K-2402', 
+                    client: 'Global Logistics', 
+                    site: 'Control Room', 
+                    address: 'Waterfront Office Park, Somerset West',
+                    contact: 'Sarah Jenkins (082-555-1234)',
+                    type: 'SANS 10139 Detection Service', 
+                    status: 'In Progress', 
+                    po: 'PO-102', 
+                    timeIn: '08:45', 
+                    devices: 32,
+                    instruction: 'Annual maintenance. Client reports intermittent "Loop Open" faults on Zone 4. Inspect cable integrity.'
+                },
+                { 
+                    id: 'K-2401', 
+                    client: 'Industrial A', 
+                    site: 'Data Center B', 
+                    address: '14 Helium Road, Brackenfell',
+                    contact: 'Mike Ross (021-999-8877)',
+                    type: 'SANS 14520 Gas Maintenance', 
+                    status: 'Scheduled', 
+                    po: 'PO-882', 
+                    timeIn: '--:--', 
+                    devices: 14,
+                    instruction: 'Cylinder pressure verification and actuator test.'
+                }
+            ],
+            vanStock: [
+                { item: '12V 7Ah Standby Battery', qty: 4 },
+                { item: 'Optical Smoke Detector B7', qty: 2 }
+            ],
+            lastSync: '12 mins ago'
+        };
+
+        function showToast(text) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-text').innerText = text;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0'), 3000);
+        }
+
+        function setNav(index) {
+            state.currentNav = index;
+            render();
+        }
+
+        function closeModal() { document.getElementById('modal-container').classList.add('hidden'); }
+        function openModal(h) { 
+            document.getElementById('modal-content').innerHTML = h; 
+            document.getElementById('modal-container').classList.remove('hidden'); 
+            lucide.createIcons(); 
+        }
+
+        function toggleLabor(mode) {
+            if (mode === 'work' && state.laborState !== 'work') {
+                state.workStartTime = new Date();
+            }
+            state.laborState = state.laborState === mode ? 'idle' : mode;
+            showToast(`${mode.charAt(0).toUpperCase() + mode.slice(1)} Pulse Updated`);
+            render();
+        }
+
+        function render() {
+            const crumbs = ['My Schedule', 'Technical Standards', 'Site Intelligence', 'Material Manifest'];
+            document.getElementById('current-page-crumb').innerText = crumbs[state.currentNav];
+            
+            [0,1,2,3].forEach(i => {
+                const btn = document.getElementById(`nav-${i}`);
+                if (btn) {
+                    if (i === state.currentNav) {
+                        btn.classList.add('sidebar-item-active', 'shadow-lg');
+                        btn.classList.remove('text-white/30');
+                    } else {
+                        btn.classList.remove('sidebar-item-active', 'shadow-lg');
+                        btn.classList.add('text-white/30');
+                    }
+                }
+            });
+
+            const content = document.getElementById('content-area');
+            content.innerHTML = renderModule(state.currentNav);
+            lucide.createIcons();
+        }
+
+        function renderModule(index) {
+            switch(index) {
+                case 0: return renderWorkOrders();
+                case 1: return renderSOPs();
+                case 2: return renderLayouts();
+                case 3: return renderVanStock();
+                default: return '';
+            }
+        }
+
+        function renderWorkOrders() {
+            const activeJob = state.jobs.find(j => j.id === state.activeJobId);
+            const queue = state.jobs.filter(j => j.id !== state.activeJobId);
+
+            return `
+                <div class="space-y-10 animate-in pb-12">
+                    <!-- LABOR PULSE RAIL -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="flex flex-col gap-2">
+                             <button onclick="toggleLabor('travel')" class="h-16 rounded-3xl border ${state.laborState === 'travel' ? 'bg-yellow-400 text-slate-950 border-yellow-400 font-black shadow-xl shadow-yellow-400/20' : 'border-white/10 text-white/40'} flex items-center justify-center gap-4 transition-all">
+                                <i data-lucide="truck"></i>
+                                <span class="text-[11px] uppercase tracking-widest">${state.laborState === 'travel' ? 'En-Route to Facility' : 'Initialize Travel'}</span>
+                            </button>
+                            ${state.laborState === 'travel' ? `
+                                <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activeJob.address)}" target="_blank" class="h-12 bg-blue-600 rounded-2xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest animate-in">
+                                    <i data-lucide="navigation" class="w-3 h-3"></i> Open Navigation to Site
+                                </a>
+                            ` : ''}
+                        </div>
+                        <button onclick="toggleLabor('work')" class="h-16 rounded-3xl border ${state.laborState === 'work' ? 'bg-green-500 text-slate-950 border-green-500 font-black shadow-xl shadow-yellow-400/20' : 'border-white/10 text-white/40'} flex items-center justify-center gap-4 transition-all">
+                            <i data-lucide="wrench"></i>
+                            <span class="text-[11px] uppercase tracking-widest">${state.laborState === 'work' ? 'Working On-Site' : 'Initialize Site Work'}</span>
+                        </button>
+                    </div>
+
+                    <!-- ACTIVE MISSION -->
+                    <div class="bg-slate-900 border-l-8 border-yellow-400 p-12 rounded-[2.5rem] shadow-2xl relative overflow-hidden">
+                        <div class="absolute -right-4 -top-4 p-12 opacity-[0.03]"><i data-lucide="shield-check" class="w-48 h-48"></i></div>
+                        <div class="relative z-10">
+                            <div class="flex justify-between items-start mb-8">
+                                <p class="text-[11px] font-black uppercase tracking-[0.4em] text-yellow-400 italic">Operational Priority: Active</p>
+                                <div class="flex items-center gap-3">
+                                    <div class="w-3 h-3 rounded-full ${state.safetyVerified ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]' : 'bg-red-500 animate-pulse shadow-[0_0_10px_rgba(239,68,68,0.5)]'}"></div>
+                                    <span class="text-[10px] font-black uppercase text-white/40 tracking-widest">${state.safetyVerified ? 'HSE Verified' : 'HSE Audit Required'}</span>
+                                </div>
+                            </div>
+                            <h3 class="text-6xl font-black mb-2 tracking-tighter uppercase italic leading-none">${activeJob.client}</h3>
+                            <p class="text-2xl text-white/40 font-bold uppercase tracking-widest">${activeJob.site} • PO: ${activeJob.po}</p>
+                            
+                            <div class="mt-8 p-6 bg-slate-800/50 rounded-2xl border border-white/5 space-y-4">
+                                <div class="flex items-start gap-4">
+                                    <i data-lucide="map-pin" class="w-5 h-5 text-yellow-400 mt-1"></i>
+                                    <div><p class="text-[10px] font-black uppercase text-white/30 tracking-widest mb-1 leading-none">Site Location</p><p class="text-sm font-medium text-white/80">${activeJob.address}</p></div>
+                                </div>
+                                <div class="flex items-start gap-4 pt-4 border-t border-white/5">
+                                    <i data-lucide="clipboard-list" class="w-5 h-5 text-yellow-400 mt-1"></i>
+                                    <div><p class="text-[10px] font-black uppercase text-white/30 tracking-widest mb-1 leading-none">Primary Directive</p><p class="text-sm font-bold text-white italic leading-relaxed">"${activeJob.instruction}"</p></div>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-12 pt-12 border-t border-white/5">
+                                <button onclick="openSafetyModal()" class="w-full py-6 ${state.safetyVerified ? 'bg-white/5 border border-white/10 text-white/20' : 'bg-red-500 text-white shadow-xl shadow-red-500/20 hover:scale-105'} rounded-[1.5rem] font-black uppercase text-[12px] tracking-[0.2em] transition-all">
+                                    <i data-lucide="shield-alert" class="inline w-5 h-5 mr-3"></i> HSE Site Verification
+                                </button>
+                                <div class="flex gap-4">
+                                    <button onclick="${state.safetyVerified ? `openJobCardModal('${activeJob.id}')` : `showToast('Complete HSE Audit First')`}" 
+                                            class="flex-1 ${state.safetyVerified ? 'btn-primary shadow-2xl shadow-yellow-400/10 hover:scale-105' : 'bg-slate-800 text-white/10 cursor-not-allowed'} py-6 text-[12px]">Digital Job Card</button>
+                                    <button onclick="${state.safetyVerified ? `openServiceReportModal('${activeJob.id}')` : `showToast('Complete HSE Audit First')`}" 
+                                            class="flex-1 bg-white/5 border border-white/10 rounded-[1.5rem] font-black uppercase text-[11px] tracking-widest hover:bg-white/10 transition-all">Service Report</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        // --- MODAL: SAFETY ---
+        function openSafetyModal() {
+            openModal(`
+                <div class="space-y-10 text-white animate-in">
+                    <div><h3 class="text-4xl font-black italic tracking-tighter uppercase italic">Safety Interlock</h3><p class="text-[11px] text-white/30 uppercase font-black mt-3 tracking-widest italic">PPE & Hazard Verification</p></div>
+                    <div class="space-y-4 bg-red-500/5 p-10 rounded-[2.5rem] border border-red-500/20">
+                        ${['Steel toe boots & High-Vis Vest active', 'Ladder safety check verified', 'Site hazards identified and isolated'].map(check => `
+                            <label class="flex items-center gap-5 cursor-pointer group p-4 bg-slate-950/50 rounded-2xl border border-white/5"><input type="checkbox" class="w-6 h-6 rounded accent-red-500"><span class="text-sm font-bold text-white/50 group-hover:text-white uppercase">${check}</span></label>`).join('')}
+                    </div>
+                    <button onclick="state.safetyVerified = true; showToast('Safety Verified'); closeModal(); render();" class="w-full py-8 bg-red-600 text-white rounded-3xl font-black uppercase text-[14px] tracking-[0.3em] shadow-2xl hover:bg-red-500 transition-all">Authorize Site Access</button>
+                </div>`);
+        }
+
+        // --- MODAL: DIGITAL JOB CARD ---
+        function openJobCardModal(id) {
+            const j = state.jobs.find(x => x.id === id);
+            const duration = state.workStartTime ? Math.round((new Date() - state.workStartTime) / 60000) : 0;
+
+            openModal(`
+                <div class="space-y-10 text-white animate-in">
+                    <div class="flex justify-between items-start">
+                        <div><h3 class="text-4xl font-black italic tracking-tighter uppercase italic">Digital Job Card</h3><p class="text-[11px] text-white/30 uppercase font-black mt-3 tracking-widest italic">${j.site} • PO: ${j.id}</p></div>
+                        <div class="parameter-badge text-center min-w-[120px]">
+                            <p class="text-[9px] font-black uppercase text-white/20 mb-1">On-Site Pulse</p>
+                            <p class="text-xl font-black italic text-yellow-400">${duration} MINS</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div class="space-y-4">
+                            <label class="text-[10px] font-black uppercase text-white/30 tracking-widest ml-1 italic">Technical Observation Log</label>
+                            <textarea id="field-observations" rows="12" class="p-6 bg-slate-950/50 text-sm leading-relaxed" placeholder="Detailed technical findings, remedial adjustments, and fault diagnostics..."></textarea>
+                        </div>
+
+                        <div class="space-y-8">
+                             <div class="space-y-4">
+                                <label class="text-[10px] font-black uppercase text-white/30 tracking-widest ml-1 italic">Engagement Details</label>
+                                <div class="grid grid-cols-1 gap-4">
+                                    <div class="p-4 bg-slate-950 rounded-2xl border border-white/5">
+                                        <p class="text-[8px] font-black text-white/20 uppercase mb-2 italic">PO / REFERENCE NUMBER</p>
+                                        <input type="text" value="${j.po}" class="bg-transparent border-none p-0 text-xl font-black text-white/80">
+                                    </div>
+                                    <div class="p-4 bg-slate-950 rounded-2xl border border-white/5">
+                                        <p class="text-[8px] font-black text-white/20 uppercase mb-2 italic">SITE CONTACT VERIFIED</p>
+                                        <input type="text" value="${j.contact.split(' ')[0]}" class="bg-transparent border-none p-0 text-xl font-black text-white/80">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="space-y-4">
+                                <label class="text-[10px] font-black uppercase text-white/30 tracking-widest ml-1 italic">Material manifest (Folder 10)</label>
+                                <div class="space-y-2">
+                                    <select id="field-spares" class="h-14 font-black uppercase italic bg-slate-950"><option>No Spares Used</option><option>Battery 12V 7Ah x1</option><option>B7 Smoke Detector x1</option></select>
+                                    <button onclick="showToast('Asset Discovery Frame Opened')" class="w-full h-12 border-2 border-dashed border-white/10 rounded-xl text-[9px] font-black uppercase text-white/30 hover:bg-white/5 flex items-center justify-center gap-3">
+                                        <i data-lucide="plus-circle" class="inline w-3 h-3 mr-2"></i> Asset Discovery (Add to Registry)
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-6 pt-6 border-t border-white/5">
+                        <button onclick="closeModal()" class="flex-1 py-6 bg-slate-800 border border-white/10 rounded-3xl font-black uppercase text-[12px] tracking-widest">Store Progress</button>
+                        <button onclick="openJobCardSummary('${id}')" class="flex-1 py-6 bg-yellow-400 text-slate-950 rounded-3xl font-black uppercase text-[12px] tracking-widest shadow-2xl">Review & Sign-Off</button>
+                    </div>
+                </div>`);
+        }
+
+        // --- MODAL: JOB CARD SUMMARY ---
+        function openJobCardSummary(id) {
+            const j = state.jobs.find(x => x.id === id);
+            const observations = document.getElementById('field-observations')?.value || "No observations recorded.";
+            const spares = document.getElementById('field-spares')?.value || "None";
+
+            openModal(`
+                <div class="space-y-8 text-white animate-in">
+                    <h3 class="text-4xl font-black italic uppercase italic text-yellow-400 leading-none">Job Completion Summary</h3>
+                    
+                    <div class="summary-block space-y-6">
+                        <div class="flex justify-between border-b border-white/5 pb-4">
+                            <div><p class="text-[9px] font-black text-white/30 uppercase tracking-widest">Client / Site</p><p class="text-lg font-black italic uppercase">${j.client} - ${j.site}</p></div>
+                            <div class="text-right"><p class="text-[9px] font-black text-white/30 uppercase tracking-widest">Reference</p><p class="text-lg font-black italic uppercase text-yellow-400">${j.po}</p></div>
+                        </div>
+                        <div>
+                            <p class="text-[9px] font-black text-white/30 uppercase tracking-widest mb-2">Technical Findings</p>
+                            <p class="text-sm italic leading-relaxed text-white/80 border-l-2 border-yellow-400 pl-4">"${observations}"</p>
+                        </div>
+                        <div>
+                            <p class="text-[9px] font-black text-white/30 uppercase tracking-widest mb-2">Materials Reconciled</p>
+                            <p class="text-xs font-bold text-white/60 uppercase">${spares}</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-8 pt-6">
+                        <div class="space-y-4">
+                            <label class="text-[10px] font-black uppercase text-white/30 tracking-widest ml-1">Specialist Signature</label>
+                            <div class="signature-pad text-[9px]">ANTHONY • KH-TECH-01</div>
+                        </div>
+                        <div class="space-y-4">
+                            <label class="text-[10px] font-black uppercase text-white/30 tracking-widest ml-1 italic">Client Sign-Off</label>
+                            <div class="signature-pad text-yellow-400/20">TOUCH TO INITIAL</div>
+                            <input id="client-name-final" placeholder="Authorized Client Name" class="h-14 font-black uppercase text-xs italic bg-slate-950">
+                        </div>
+                    </div>
+
+                    <div class="flex gap-4">
+                        <button onclick="openJobCardModal('${id}')" class="px-8 py-5 border border-white/5 bg-slate-800 rounded-3xl font-black uppercase text-[10px] text-white/40">Edit Data</button>
+                        <button onclick="showToast('Job Committed to Folder 11'); closeModal();" class="flex-1 py-6 bg-green-600 text-white rounded-[2rem] font-black uppercase text-[12px] tracking-[0.3em] shadow-2xl active:scale-95 transition-all">Submit Authorized Job Card</button>
+                    </div>
+                </div>`);
+        }
+
+        // --- MODAL: SERVICE REPORT (EXTENSIVE SANS 10139) ---
+        function openServiceReportModal(id) {
+            const j = state.jobs.find(x => x.id === id);
+            openModal(`
+                <div class="space-y-10 text-white animate-in">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="text-4xl font-black italic tracking-tighter uppercase italic leading-none">SANS 10139 Service Report</h3>
+                            <p class="text-[11px] text-white/30 uppercase font-black mt-4 tracking-widest italic">Clause 15 Compliance Audit</p>
+                        </div>
+                        <i data-lucide="shield-check" class="w-16 h-16 text-green-500 opacity-20"></i>
+                    </div>
+
+                    <!-- 1. POWER SUPPLY & CIE -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                        <div class="space-y-6">
+                            <h4 class="sans-section-header"><i data-lucide="zap" class="w-3 h-3"></i> 1. CIE & Power Audit</h4>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="p-4 bg-slate-950 rounded-2xl border border-white/5">
+                                    <p class="text-[8px] font-black text-white/20 uppercase mb-2">MAINS VOLTAGE (VAC)</p>
+                                    <input type="text" class="bg-transparent border-none p-0 text-lg font-black text-yellow-400" placeholder="230">
+                                </div>
+                                <div class="p-4 bg-slate-950 rounded-2xl border border-white/5">
+                                    <p class="text-[8px] font-black text-white/20 uppercase mb-2">CHARGER VOLTAGE (VDC)</p>
+                                    <input type="text" class="bg-transparent border-none p-0 text-lg font-black text-white/80" placeholder="27.4">
+                                </div>
+                            </div>
+                            <div class="p-4 bg-slate-950 rounded-2xl border border-white/5">
+                                <p class="text-[8px] font-black text-white/20 uppercase mb-4">BATTERY LOAD TEST (SANS REQ)</p>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <input placeholder="START: 26.5V" class="bg-slate-900 h-10 rounded-lg px-4 text-xs font-bold">
+                                    <input placeholder="END: 24.8V" class="bg-slate-900 h-10 rounded-lg px-4 text-xs font-bold">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 2. INTERFACING & AUXILIARIES -->
+                        <div class="space-y-6">
+                            <h4 class="sans-section-header"><i data-lucide="layers" class="w-3 h-3"></i> 2. Interface Verification</h4>
+                            <div class="space-y-3">
+                                ${['Ground Fault Monitoring Active', 'Remote Signal Transmission OK', 'Fire Relay / Plant Shutdown Tested', 'Sounder Audibility (65dBA min)'].map(test => `
+                                    <label class="flex items-center gap-4 cursor-pointer group p-4 bg-slate-950 rounded-2xl border border-white/5 hover:border-green-500/30 transition-all">
+                                        <input type="checkbox" class="w-5 h-5 rounded accent-green-500">
+                                        <span class="text-xs font-bold text-white/50 group-hover:text-white uppercase tracking-tight">${test}</span>
+                                    </label>`).join('')}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. DEVICE LEDGER -->
+                    <div class="space-y-6">
+                        <div class="flex justify-between items-end">
+                            <h4 class="sans-section-header"><i data-lucide="list" class="w-3 h-3"></i> 3. Device Integrity Matrix</h4>
+                            <p class="text-[9px] font-black text-white/20 mb-4 uppercase">Total Devices in Registry: ${j.devices}</p>
+                        </div>
+                        <div class="bg-slate-950 rounded-3xl border border-white/5 overflow-hidden">
+                            <div class="grid grid-cols-5 p-4 bg-white/5 text-[9px] font-black uppercase text-white/20 tracking-widest">
+                                <span>ID/Zone</span><span>Device Type</span><span>Location Note</span><span>Sensitivity</span><span>Pass</span>
+                            </div>
+                            <div class="max-h-[250px] overflow-y-auto">
+                                ${[1,2,3,4,5,6].map(i => `
+                                    <div class="device-row grid grid-cols-5 p-4 items-center border-t border-white/5">
+                                        <span class="text-xs font-bold text-white/60">Z${Math.ceil(i/5)}-0${i}</span>
+                                        <span class="text-[10px] text-white/30 font-black uppercase">Smoke Opt.</span>
+                                        <input class="bg-transparent border-none text-[10px] text-white/40 p-0 italic" placeholder="Office Corridor">
+                                        <span class="text-[10px] text-yellow-400 font-bold uppercase tracking-tighter">Normal</span>
+                                        <input type="checkbox" class="w-4 h-4 accent-green-500 justify-self-center" checked>
+                                    </div>`).join('')}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 4. SITE HYGIENE & LOGS -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 pt-8 border-t border-white/5">
+                        <div class="space-y-4">
+                            <h4 class="sans-section-header">4. Documentation Audit</h4>
+                            <div class="space-y-3">
+                                ${['Physical Logbook Updated (Folder 05)', 'Zone Chart Accuracy Verified (Folder 07)', 'Spare Glass & Key Stock Verified'].map(log => `
+                                    <label class="flex items-center gap-4 cursor-pointer group"><input type="checkbox" class="w-5 h-5 rounded accent-green-500"><span class="text-xs font-bold text-white/40 uppercase">${log}</span></label>`).join('')}
+                            </div>
+                        </div>
+                        <div class="space-y-4">
+                            <h4 class="sans-section-header">5. Final SANS Declaration</h4>
+                            <div class="p-6 bg-slate-950/80 border border-white/5 rounded-2xl italic text-[10px] text-white/40 leading-relaxed font-medium">
+                                "I hereby certify that the fire detection and alarm system at the above-mentioned premises has been serviced and tested in accordance with the recommendations of SANS 10139:2021 Clause 15."
+                            </div>
+                            <div class="signature-pad text-[9px]">ANTHONY (TECH-01) - SIGNED DIGITALLY</div>
+                        </div>
+                    </div>
+
+                    <button onclick="showToast('SANS 10139 Certificate Generated'); closeModal();" class="w-full py-8 bg-green-600 text-white rounded-[2rem] font-black uppercase text-[14px] tracking-[0.4em] shadow-2xl active:scale-95 transition-all">Submit Certified Service Report</button>
+                </div>`);
+        }
+
+        function renderVanStock() {
+            return `
+                <div class="space-y-10 animate-in max-w-4xl pb-10">
+                    <div class="flex justify-between items-end">
+                        <div><h3 class="text-4xl font-black italic uppercase tracking-tighter leading-none">Vehicle Manifest</h3><p class="text-white/30 text-[11px] uppercase tracking-widest font-black mt-4 italic">Folder 10 • On-Hand Logistics Hub</p></div>
+                        <div class="text-right"><p class="text-[9px] font-black text-white/20 uppercase tracking-[0.3em]">Last Manifest Sync</p><p class="text-xs font-bold text-yellow-400 mt-1 uppercase">${state.lastSync}</p></div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        ${state.vanStock.map(s => `
+                            <div class="command-card p-12 flex justify-between items-center group">
+                                <div class="space-y-1">
+                                    <h4 class="text-2xl font-black italic uppercase tracking-tighter text-white/80 leading-none mb-2">${s.item}</h4>
+                                    <p class="text-[10px] text-white/20 font-black uppercase tracking-widest">SANS Regulatory Spec</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-6xl font-black italic text-yellow-400 leading-none">${s.qty}</p>
+                                    <p class="text-[10px] font-black text-white/10 uppercase tracking-widest mt-2">Verified</p>
+                                </div>
+                            </div>`).join('')}
+                    </div>
+                    <button onclick="showToast('Discrepancy Reported to Office Manager')" class="w-full py-6 bg-white/5 border border-white/10 rounded-[2rem] text-[11px] font-black uppercase tracking-[0.4em] hover:bg-white/10 transition-all text-white/20 hover:text-white">Audit Discrepancy Alert</button>
+                </div>`;
+        }
+
+        function renderSOPs() { return `<div class="p-32 text-center text-white/10 italic font-black uppercase tracking-widest"><h3>[ Accessing Technical Standard Library (Folder 12)... ]</h3></div>`; }
+        function renderLayouts() { return `<div class="p-32 text-center text-white/10 italic font-black uppercase tracking-widest"><h3>[ Accessing Facility Intelligence (Folder 07)... ]</h3></div>`; }
+
+        window.onload = render;
+    </script>
+</body>
+</html>
