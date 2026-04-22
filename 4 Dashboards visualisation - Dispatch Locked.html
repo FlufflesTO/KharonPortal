@@ -4,13 +4,170 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kharon Dispatch Command - Operational Engine</title>
-    <script src="https://cdn.tailwindcss.com">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // === DISPATCH PORTAL SPECIFIC FEATURES ===
         
-        // === DISPATCH PORTAL SPECIFIC FEATURES (See KHARON_PORTAL_CAPABILITY_ASSESSMENT.md for implementation) ===
-        // TODO: Implement dispatch portal specific functionality
+        // GPS Map Visualization with Leaflet
+        let map = null;
+        let technicianMarkers = [];
         
-        // === ENHANCED FUNCTIONALITY ===
+        function initGPSMap() {
+            if (map) return; // Already initialized
+            
+            // Create map centered on a default location (can be configured)
+            map = L.map('gps-map').setView([51.505, -0.09], 13);
+            
+            // Add OpenStreetMap tiles
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 18
+            }).addTo(map);
+            
+            // Simulate technician locations
+            updateTechnicianLocations();
+            
+            // Auto-refresh locations every 30 seconds
+            setInterval(updateTechnicianLocations, 30000);
+        }
         
+        function updateTechnicianLocations() {
+            // Clear existing markers
+            technicianMarkers.forEach(marker => map.removeLayer(marker));
+            technicianMarkers = [];
+            
+            // Mock technician data with GPS coordinates
+            const technicians = [
+                { id: 'TECH-001', name: 'John D.', lat: 51.505, lng: -0.09, status: 'en-route' },
+                { id: 'TECH-002', name: 'Sarah M.', lat: 51.515, lng: -0.10, status: 'on-site' },
+                { id: 'TECH-003', name: 'Mike R.', lat: 51.495, lng: -0.08, status: 'available' },
+                { id: 'TECH-004', name: 'Emma L.', lat: 51.510, lng: -0.11, status: 'en-route' }
+            ];
+            
+            // Status color mapping
+            const statusColors = {
+                'available': '#16a34a',
+                'en-route': '#d97706',
+                'on-site': '#3b82f6',
+                'offline': '#dc2626'
+            };
+            
+            // Add markers for each technician
+            technicians.forEach(tech => {
+                const markerHtml = `
+                    <div style="
+                        background-color: ${statusColors[tech.status]};
+                        width: 16px;
+                        height: 16px;
+                        border-radius: 50%;
+                        border: 3px solid white;
+                        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                    "></div>
+                `;
+                
+                const icon = L.divIcon({
+                    html: markerHtml,
+                    className: 'custom-marker',
+                    iconSize: [20, 20],
+                    iconAnchor: [10, 10]
+                });
+                
+                const marker = L.marker([tech.lat, tech.lng], { icon })
+                    .addTo(map)
+                    .bindPopup(`
+                        <strong>${tech.name}</strong><br>
+                        ID: ${tech.id}<br>
+                        Status: ${tech.status}<br>
+                        Last Update: ${new Date().toLocaleTimeString()}
+                    `);
+                
+                technicianMarkers.push(marker);
+            });
+            
+            showToast('Technician locations updated', 'info');
+        }
+        
+        // Drag-and-Drop Scheduling
+        let draggedJob = null;
+        
+        function handleDragStart(event, jobId) {
+            draggedJob = jobId;
+            event.dataTransfer.setData('text/plain', jobId);
+            event.dataTransfer.effectAllowed = 'move';
+            // Add visual feedback
+            event.target.classList.add('dragging');
+        }
+        
+        function handleDragEnd(event) {
+            event.target.classList.remove('dragging');
+            draggedJob = null;
+        }
+        
+        function handleDragOver(event) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'move';
+            event.currentTarget.classList.add('drag-over');
+        }
+        
+        function handleDragLeave(event) {
+            event.currentTarget.classList.remove('drag-over');
+        }
+        
+        function handleDrop(event, technicianId, timeSlot) {
+            event.preventDefault();
+            event.currentTarget.classList.remove('drag-over');
+            
+            if (draggedJob) {
+                // Assign job to technician and time slot
+                assignJobToTechnician(draggedJob, technicianId, timeSlot);
+            }
+        }
+        
+        function assignJobToTechnician(jobId, technicianId, timeSlot) {
+            // Update job assignment in state
+            const jobs = Storage.get('dispatchJobs', state.jobs);
+            const jobIndex = jobs.findIndex(j => j.id === jobId);
+            
+            if (jobIndex !== -1) {
+                jobs[jobIndex].assignedTo = technicianId;
+                jobs[jobIndex].scheduledTime = timeSlot;
+                jobs[jobIndex].status = 'scheduled';
+                
+                Storage.set('dispatchJobs', jobs);
+                renderSchedule();
+                showToast(`Job ${jobId} assigned to ${technicianId} at ${timeSlot}`, 'success');
+            }
+        }
+        
+        // Capacity animation helper
+        function animateCapacity(elementId, from, to) {
+            const element = document.getElementById(elementId);
+            if (!element) return;
+            
+            const duration = 500;
+            const startTime = performance.now();
+            
+            function animate(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                
+                // Easing function
+                const eased = 1 - Math.pow(1 - progress, 3);
+                const currentValue = from + (to - from) * eased;
+                
+                element.style.width = `${currentValue}%`;
+                element.setAttribute('aria-valuenow', Math.round(currentValue));
+                
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                }
+            }
+            
+            requestAnimationFrame(animate);
+        }
+
         // Mobile Menu Toggle
         function toggleMobileMenu() {
             const sidebar = document.getElementById('sidebar');
