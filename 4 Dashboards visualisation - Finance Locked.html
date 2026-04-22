@@ -912,7 +912,138 @@
             if (savedNav !== null && typeof setNav === 'function') {
                 setNav(savedNav);
             }
+            
+            // Initialize Finance Portal specific features
+            renderInvoices();
         });
+
+        // ===== SECURE ID GENERATION =====
+        function generateSecureId(prefix = 'INV') {
+            const uuid = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).substr(2);
+            return `${prefix}-${uuid.split('-')[0].toUpperCase()}`;
+        }
+
+        // ===== CSV EXPORT IMPLEMENTATION =====
+        function exportToCSV() {
+            const invoices = Storage.get('invoices', state.invoices);
+            const headers = ['ID', 'Client', 'Amount', 'Date', 'Status', 'Aging'];
+            const rows = invoices.map(inv => [
+                inv.id,
+                inv.client,
+                inv.amount,
+                inv.date,
+                inv.status,
+                calculateAging(inv.date)
+            ]);
+            
+            const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `kharon_invoices_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+            showToast('CSV export generated successfully', 'success');
+        }
+
+        // ===== PDF EXPORT IMPLEMENTATION =====
+        function exportToPDF() {
+            // Simple PDF-like print export
+            const printWindow = window.open('', '_blank');
+            const invoices = Storage.get('invoices', state.invoices);
+            
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html><head><title>Kharon Invoice Report</title>
+                <style>
+                    body { font-family: Arial, sans-serif; padding: 40px; }
+                    h1 { color: #1e293b; border-bottom: 3px solid #3b82f6; padding-bottom: 10px; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                    th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+                    th { background: #f1f5f9; font-weight: bold; }
+                    .status-paid { color: #16a34a; font-weight: bold; }
+                    .status-pending { color: #d97706; font-weight: bold; }
+                    .status-overdue { color: #dc2626; font-weight: bold; }
+                </style></head><body>
+                <h1>Kharon Portal - Invoice Report</h1>
+                <p>Generated: ${new Date().toLocaleString()}</p>
+                <table>
+                    <thead><tr><th>ID</th><th>Client</th><th>Amount</th><th>Date</th><th>Status</th><th>Aging (Days)</th></tr></thead>
+                    <tbody>
+                        ${invoices.map(inv => `
+                            <tr>
+                                <td>${inv.id}</td>
+                                <td>${inv.client}</td>
+                                <td>${formatCurrency(inv.amount)}</td>
+                                <td>${inv.date}</td>
+                                <td class="status-${inv.status.toLowerCase()}">${inv.status}</td>
+                                <td>${calculateAging(inv.date)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+                </body></html>
+            `);
+            printWindow.document.close();
+            printWindow.print();
+            showToast('PDF export ready for printing', 'info');
+        }
+
+        // ===== DYNAMIC AGING CALCULATION =====
+        function calculateAging(dateStr) {
+            const invoiceDate = new Date(dateStr);
+            const today = new Date();
+            const diffTime = Math.abs(today - invoiceDate);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            return diffDays;
+        }
+
+        // ===== INVOICE RENDERING WITH SEARCH/FILTER =====
+        function renderInvoices() {
+            const container = document.getElementById('invoice-list');
+            if (!container) return;
+
+            let invoices = Storage.get('invoices', state.invoices);
+            
+            // Apply search filter
+            const searchTerm = document.getElementById('invoice-search')?.value?.toLowerCase() || '';
+            if (searchTerm) {
+                invoices = invoices.filter(inv => 
+                    inv.client.toLowerCase().includes(searchTerm) || 
+                    inv.id.toLowerCase().includes(searchTerm)
+                );
+            }
+
+            // Apply status filter
+            const statusFilter = document.getElementById('invoice-status-filter')?.value || 'all';
+            if (statusFilter !== 'all') {
+                invoices = invoices.filter(inv => inv.status.toLowerCase() === statusFilter);
+            }
+
+            if (invoices.length === 0) {
+                container.innerHTML = '<div class="col-span-full text-center py-12 text-gray-500"><i data-lucide="inbox" class="w-12 h-12 mx-auto mb-4 opacity-50"></i><p>No invoices found</p></div>';
+            } else {
+                container.innerHTML = invoices.map(inv => {
+                    const aging = calculateAging(inv.date);
+                    const agingClass = aging > 60 ? 'text-red-600' : aging > 30 ? 'text-yellow-600' : 'text-green-600';
+                    return `
+                        <div class="bg-white rounded-lg shadow p-4 border-l-4 ${inv.status === 'Paid' ? 'border-green-500' : inv.status === 'Overdue' ? 'border-red-500' : 'border-yellow-500'}">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p class="font-bold text-gray-800">${inv.client}</p>
+                                    <p class="text-xs text-gray-500">${inv.id} • ${inv.date}</p>
+                                </div>
+                                <span class="px-2 py-1 text-xs font-bold rounded ${inv.status === 'Paid' ? 'bg-green-100 text-green-700' : inv.status === 'Overdue' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}">${inv.status}</span>
+                            </div>
+                            <div class="mt-3 flex justify-between items-center">
+                                <span class="text-lg font-bold text-blue-600">${formatCurrency(inv.amount)}</span>
+                                <span class="text-xs ${agingClass}">${aging} days old</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+            lucide.createIcons();
+        }
 
     </script>
 </body>

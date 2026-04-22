@@ -524,6 +524,43 @@
         <span id="toast-text" class="font-bold text-sm uppercase tracking-widest font-black italic">Success</span>
     </div>
 
+    <!-- Signature Pad Modal -->
+    <div id="signature-modal" class="modal fixed inset-0 bg-black/70 hidden items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="signature-modal-title">
+        <div class="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 id="signature-modal-title" class="text-lg font-semibold mb-4">Capture Signature</h3>
+            <div class="border-2 border-dashed border-gray-300 rounded-lg overflow-hidden bg-white touch-none">
+                <canvas id="signature-canvas" width="400" height="200" class="w-full h-48 cursor-crosshair"></canvas>
+            </div>
+            <div class="flex gap-2 mt-4">
+                <button onclick="clearSignature()" type="button" class="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded transition-colors" aria-label="Clear signature">
+                    <i data-lucide="trash-2" class="w-4 h-4 inline mr-1"></i> Clear
+                </button>
+                <button onclick="saveSignature()" type="button" class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors" aria-label="Save signature">
+                    <i data-lucide="check" class="w-4 h-4 inline mr-1"></i> Save
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Camera Capture Modal -->
+    <div id="camera-modal" class="modal fixed inset-0 bg-black/70 hidden items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="camera-modal-title">
+        <div class="bg-white rounded-lg p-6 w-full max-w-lg mx-4">
+            <h3 id="camera-modal-title" class="text-lg font-semibold mb-4">Capture Photo Evidence</h3>
+            <div class="relative bg-black rounded-lg overflow-hidden">
+                <video id="camera-video" autoplay playsinline class="w-full h-64 object-cover"></video>
+                <canvas id="camera-canvas" class="hidden"></canvas>
+            </div>
+            <div class="flex gap-2 mt-4">
+                <button onclick="stopCamera()" type="button" class="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded transition-colors" aria-label="Cancel camera">
+                    <i data-lucide="x" class="w-4 h-4 inline mr-1"></i> Cancel
+                </button>
+                <button onclick="capturePhoto()" type="button" class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors" aria-label="Capture photo">
+                    <i data-lucide="camera" class="w-4 h-4 inline mr-1"></i> Capture
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const state = {
             currentNav: 0,
@@ -1046,7 +1083,362 @@
             if (savedNav !== null && typeof setNav === 'function') {
                 setNav(savedNav);
             }
+            
+            // Initialize Tech Portal specific features
+            updateOnlineStatus();
+            initVanStock();
+            renderSafetyChecklist();
+            renderPhotoGrid();
         });
+
+        // ===== SIGNATURE PAD IMPLEMENTATION =====
+        let signatureCanvas = null;
+        let signatureCtx = null;
+        let isDrawing = false;
+        let lastX = 0;
+        let lastY = 0;
+
+        function initSignaturePad() {
+            const canvas = document.getElementById('signature-canvas');
+            if (!canvas) return;
+            
+            signatureCanvas = canvas;
+            signatureCtx = canvas.getContext('2d');
+            
+            // Set canvas size for high DPI displays
+            const rect = canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            signatureCtx.scale(dpr, dpr);
+            
+            // Style
+            signatureCtx.strokeStyle = '#000';
+            signatureCtx.lineWidth = 2;
+            signatureCtx.lineCap = 'round';
+            signatureCtx.lineJoin = 'round';
+            
+            // Mouse events
+            canvas.addEventListener('mousedown', startDrawing);
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', stopDrawing);
+            canvas.addEventListener('mouseout', stopDrawing);
+            
+            // Touch events
+            canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+            canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+            canvas.addEventListener('touchend', stopDrawing);
+        }
+
+        function getPos(e) {
+            const rect = signatureCanvas.getBoundingClientRect();
+            return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+        }
+
+        function startDrawing(e) {
+            isDrawing = true;
+            const pos = getPos(e);
+            lastX = pos.x;
+            lastY = pos.y;
+        }
+
+        function draw(e) {
+            if (!isDrawing) return;
+            const pos = getPos(e);
+            signatureCtx.beginPath();
+            signatureCtx.moveTo(lastX, lastY);
+            signatureCtx.lineTo(pos.x, pos.y);
+            signatureCtx.stroke();
+            lastX = pos.x;
+            lastY = pos.y;
+        }
+
+        function stopDrawing() { isDrawing = false; }
+
+        function handleTouchStart(e) {
+            e.preventDefault();
+            const touch = e.touches[0];
+            isDrawing = true;
+            const rect = signatureCanvas.getBoundingClientRect();
+            lastX = touch.clientX - rect.left;
+            lastY = touch.clientY - rect.top;
+        }
+
+        function handleTouchMove(e) {
+            e.preventDefault();
+            if (!isDrawing) return;
+            const touch = e.touches[0];
+            const rect = signatureCanvas.getBoundingClientRect();
+            const x = touch.clientX - rect.left;
+            const y = touch.clientY - rect.top;
+            signatureCtx.beginPath();
+            signatureCtx.moveTo(lastX, lastY);
+            signatureCtx.lineTo(x, y);
+            signatureCtx.stroke();
+            lastX = x;
+            lastY = y;
+        }
+
+        function clearSignature() {
+            if (signatureCtx) {
+                const rect = signatureCanvas.getBoundingClientRect();
+                signatureCtx.clearRect(0, 0, rect.width, rect.height);
+            }
+        }
+
+        function saveSignature() {
+            if (!signatureCanvas) return;
+            const signatureData = signatureCanvas.toDataURL('image/png');
+            Storage.set('technician_signature', signatureData);
+            showToast('Signature saved successfully', 'success');
+            closeModal('signature-modal');
+        }
+
+        function openSignaturePad() {
+            document.getElementById('signature-modal').classList.remove('hidden');
+            document.getElementById('signature-modal').classList.add('flex');
+            setTimeout(() => initSignaturePad(), 100);
+            lucide.createIcons();
+        }
+
+        // ===== CAMERA INTEGRATION IMPLEMENTATION =====
+        let cameraStream = null;
+        let videoElement = null;
+
+        async function initCamera() {
+            videoElement = document.getElementById('camera-video');
+            if (!videoElement) return;
+
+            try {
+                cameraStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
+                });
+                videoElement.srcObject = cameraStream;
+                showToast('Camera activated', 'info');
+            } catch (err) {
+                console.error('Camera access error:', err);
+                showToast('Camera access denied. Please enable camera permissions.', 'error');
+            }
+        }
+
+        function stopCamera() {
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+                cameraStream = null;
+            }
+            if (videoElement) videoElement.srcObject = null;
+            closeModal('camera-modal');
+        }
+
+        function capturePhoto() {
+            if (!videoElement || !cameraStream) {
+                showToast('Camera not initialized', 'error');
+                return;
+            }
+            const canvas = document.getElementById('camera-canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = videoElement.videoWidth;
+            canvas.height = videoElement.videoHeight;
+            context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+            const photoData = canvas.toDataURL('image/jpeg', 0.85);
+            const photos = Storage.get('technician_photos', []);
+            const photoId = crypto.randomUUID ? crypto.randomUUID() : 'photo-' + Date.now();
+            photos.push({ id: photoId, data: photoData, timestamp: new Date().toISOString() });
+            Storage.set('technician_photos', photos);
+            showToast('Photo captured successfully', 'success');
+            stopCamera();
+            renderPhotoGrid();
+        }
+
+        function openCamera() {
+            document.getElementById('camera-modal').classList.remove('hidden');
+            document.getElementById('camera-modal').classList.add('flex');
+            setTimeout(() => initCamera(), 100);
+            lucide.createIcons();
+        }
+
+        function renderPhotoGrid() {
+            const grid = document.getElementById('photo-grid');
+            if (!grid) return;
+            const photos = Storage.get('technician_photos', []);
+            if (photos.length === 0) {
+                grid.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500"><i data-lucide="camera-off" class="w-12 h-12 mx-auto mb-2 opacity-50"></i><p>No photos captured</p></div>';
+            } else {
+                grid.innerHTML = photos.map(photo => `
+                    <div class="relative group aspect-square bg-gray-100 rounded-lg overflow-hidden">
+                        <img src="${photo.data}" alt="Evidence photo" class="w-full h-full object-cover">
+                        <button onclick="deletePhoto('${photo.id}')" type="button" class="absolute top-1 right-1 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Delete photo">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                        <div class="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs p-1">${new Date(photo.timestamp).toLocaleString()}</div>
+                    </div>`).join('');
+            }
+            lucide.createIcons();
+        }
+
+        function deletePhoto(photoId) {
+            const photos = Storage.get('technician_photos', []);
+            Storage.set('technician_photos', photos.filter(p => p.id !== photoId));
+            renderPhotoGrid();
+            showToast('Photo deleted', 'info');
+        }
+
+        // ===== OFFLINE/ONLINE DETECTION =====
+        function updateOnlineStatus() {
+            const indicator = document.getElementById('online-indicator');
+            const statusText = document.getElementById('status-text');
+            if (!indicator || !statusText) return;
+            if (navigator.onLine) {
+                indicator.className = 'w-3 h-3 bg-green-500 rounded-full animate-pulse';
+                statusText.textContent = 'Online';
+                statusText.className = 'text-xs text-green-600 font-medium';
+            } else {
+                indicator.className = 'w-3 h-3 bg-red-500 rounded-full';
+                statusText.textContent = 'Offline';
+                statusText.className = 'text-xs text-red-600 font-medium';
+                showToast('You are offline. Changes will sync when connection is restored.', 'warning');
+            }
+        }
+        window.addEventListener('online', () => { updateOnlineStatus(); showToast('Connection restored. Syncing data...', 'success'); });
+        window.addEventListener('offline', () => { updateOnlineStatus(); });
+
+        // ===== LABOR STATE TRACKING =====
+        let laborTimer = null;
+        let laborStartTime = null;
+        let laborElapsed = 0;
+
+        function startLaborTracking(jobId) {
+            if (laborTimer) return;
+            laborStartTime = Date.now();
+            const savedState = Storage.get('labor_state', {});
+            if (savedState[jobId]) laborElapsed = savedState[jobId].elapsed || 0;
+            updateLaborDisplay();
+            laborTimer = setInterval(() => {
+                laborElapsed = Math.floor((Date.now() - laborStartTime) / 1000) + (savedState[jobId]?.elapsed || 0);
+                updateLaborDisplay();
+                if (laborElapsed % 10 === 0) Storage.set('labor_state', { [jobId]: { elapsed: laborElapsed, startTime: laborStartTime } });
+            }, 1000);
+            showToast('Labor tracking started', 'info');
+        }
+
+        function stopLaborTracking(jobId) {
+            if (laborTimer) {
+                clearInterval(laborTimer);
+                laborTimer = null;
+                const savedState = Storage.get('labor_state', {});
+                savedState[jobId] = { elapsed: laborElapsed, endTime: new Date().toISOString(), completed: true };
+                Storage.set('labor_state', savedState);
+                laborElapsed = 0;
+                laborStartTime = null;
+                updateLaborDisplay();
+                showToast('Labor tracking stopped. Time logged.', 'success');
+            }
+        }
+
+        function formatTime(seconds) {
+            const hrs = Math.floor(seconds / 3600);
+            const mins = Math.floor((seconds % 3600) / 60);
+            const secs = seconds % 60;
+            return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function updateLaborDisplay() {
+            const display = document.getElementById('labor-timer');
+            if (display) display.textContent = formatTime(laborElapsed);
+        }
+
+        // ===== SAFETY VERIFICATION CHECKLIST =====
+        const safetyChecklist = [
+            { id: 'ppe', label: 'PPE worn (helmet, gloves, boots, glasses)' },
+            { id: 'lockout', label: 'Lock-out/Tag-out verified' },
+            { id: 'permits', label: 'Work permits obtained' },
+            { id: 'hazards', label: 'Area hazards identified' },
+            { id: 'tools', label: 'Tools inspected and functional' },
+            { id: 'emergency', label: 'Emergency procedures reviewed' }
+        ];
+
+        function renderSafetyChecklist() {
+            const container = document.getElementById('safety-checklist');
+            if (!container) return;
+            const savedChecks = Storage.get('safety_checks', {});
+            container.innerHTML = `<div class="space-y-3">${safetyChecklist.map(item => `
+                <label class="flex items-start gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
+                    <input type="checkbox" id="safety-${item.id}" class="mt-0.5 w-5 h-5 text-blue-600 rounded focus:ring-blue-500" ${savedChecks[item.id] ? 'checked' : ''} onchange="toggleSafetyCheck('${item.id}')">
+                    <span class="text-sm text-gray-700">${item.label}</span>
+                </label>`).join('')}</div>
+                <div class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
+                    <p class="text-sm text-yellow-800"><i data-lucide="alert-triangle" class="w-4 h-4 inline mr-1"></i>All items must be checked before proceeding with work.</p>
+                </div>`;
+            lucide.createIcons();
+        }
+
+        function toggleSafetyCheck(id) {
+            const checks = Storage.get('safety_checks', {});
+            checks[id] = document.getElementById(`safety-${id}`).checked;
+            Storage.set('safety_checks', checks);
+            if (safetyChecklist.every(item => checks[item.id])) showToast('Safety verification complete. You may proceed.', 'success');
+        }
+
+        function verifySafetyComplete() {
+            const checks = Storage.get('safety_checks', {});
+            if (!safetyChecklist.every(item => checks[item.id])) {
+                showToast('Please complete all safety checks before proceeding', 'error');
+                return false;
+            }
+            return true;
+        }
+
+        // ===== VAN STOCK MANAGEMENT =====
+        const defaultStock = [
+            { id: 'cable-cat6', name: 'CAT6 Cable (305m box)', quantity: 2, minLevel: 1, unit: 'box' },
+            { id: 'connector-rj45', name: 'RJ45 Connectors', quantity: 50, minLevel: 20, unit: 'pcs' },
+            { id: 'switch-8port', name: '8-Port Network Switch', quantity: 3, minLevel: 2, unit: 'unit' },
+            { id: 'patch-panel', name: '24-Port Patch Panel', quantity: 2, minLevel: 1, unit: 'unit' },
+            { id: 'fiber-patch', name: 'Fiber Patch Cable LC-LC', quantity: 10, minLevel: 5, unit: 'pcs' },
+            { id: 'conduit-25mm', name: 'Conduit 25mm (coil)', quantity: 3, minLevel: 2, unit: 'coil' }
+        ];
+
+        function initVanStock() {
+            const stock = Storage.get('van_stock', defaultStock);
+            Storage.set('van_stock', stock);
+            renderVanStock();
+            checkLowStock();
+        }
+
+        function renderVanStock() {
+            const container = document.getElementById('van-stock-list');
+            if (!container) return;
+            const stock = Storage.get('van_stock', defaultStock);
+            container.innerHTML = stock.map(item => {
+                const isLow = item.quantity <= item.minLevel;
+                return `<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg ${isLow ? 'border-2 border-red-300 bg-red-50' : ''}">
+                    <div><p class="font-medium text-sm">${item.name}</p><p class="text-xs text-gray-500">Min: ${item.minLevel} ${item.unit}</p></div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="adjustStock('${item.id}', -1)" class="w-8 h-8 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded transition-colors" aria-label="Decrease quantity"><i data-lucide="minus" class="w-4 h-4"></i></button>
+                        <span class="w-12 text-center font-semibold ${isLow ? 'text-red-600' : ''}">${item.quantity}</span>
+                        <button onclick="adjustStock('${item.id}', 1)" class="w-8 h-8 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded transition-colors" aria-label="Increase quantity"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                    </div>
+                </div>`;
+            }).join('');
+            lucide.createIcons();
+        }
+
+        function adjustStock(itemId, delta) {
+            const stock = Storage.get('van_stock', defaultStock);
+            const item = stock.find(s => s.id === itemId);
+            if (item) {
+                item.quantity = Math.max(0, item.quantity + delta);
+                Storage.set('van_stock', stock);
+                renderVanStock();
+                checkLowStock();
+            }
+        }
+
+        function checkLowStock() {
+            const stock = Storage.get('van_stock', defaultStock);
+            const lowItems = stock.filter(s => s.quantity <= s.minLevel);
+            if (lowItems.length > 0) showToast(`Low stock alert: ${lowItems.map(i => i.name).join(', ')}`, 'warning');
+        }
 
     </script>
 </body>
