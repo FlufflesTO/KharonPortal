@@ -1,5 +1,1 @@
-desktop.ini
-.DS_Store
-Thumbs.db
-node_modules/
-.env
+Nothing should be ignored based on the provided file changes. The only added file is a markdown document (.md) which is source content and should not be ignored.
