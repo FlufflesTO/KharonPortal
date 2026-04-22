@@ -1,1 +1,33 @@
-Nothing needs to be added to .gitignore since the changes only include markdown files (.md) and a shell script (.sh), which are source/config files and not build artifacts, dependencies, or temporary files.
+```
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+.ENV
+.ENV.local
+.env
+.env.local
+.env.*
+.env.local.*
+.env.vault
+.python-version
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.pytest_cache/
+.hypothesis/
+.DS_Store
+Thumbs.db
+```
