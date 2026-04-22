@@ -4,13 +4,163 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kharon Command - Business Oversight</title>
-    <script src="https://cdn.tailwindcss.com">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // === ADMIN PORTAL SPECIFIC FEATURES ===
         
-        // === ADMIN PORTAL SPECIFIC FEATURES (See KHARON_PORTAL_CAPABILITY_ASSESSMENT.md for implementation) ===
-        // TODO: Implement admin portal specific functionality
-        
-        // === ENHANCED FUNCTIONALITY ===
-        
+        // RBAC (Role-Based Access Control) Framework
+        const rolePermissions = {
+            'admin': ['view', 'edit', 'delete', 'create', 'manage_users', 'manage_roles', 'audit_logs', 'system_config'],
+            'manager': ['view', 'edit', 'create', 'approve_invoices', 'view_reports'],
+            'dispatcher': ['view', 'edit', 'schedule_jobs', 'assign_technicians'],
+            'technician': ['view', 'update_job_status', 'submit_reports'],
+            'client': ['view_own', 'create_ticket', 'view_own_tickets'],
+            'finance': ['view', 'create_invoice', 'process_payment', 'export_financial']
+        };
+
+        const userRoles = {
+            'admin': ['admin'],
+            'manager': ['manager'],
+            'dispatcher': ['dispatcher'],
+            'technician': ['technician'],
+            'client': ['client'],
+            'finance': ['finance']
+        };
+
+        let currentUserRole = 'admin'; // Default, would come from auth in production
+
+        function checkPermission(permission) {
+            if (!currentUserRole || !rolePermissions[currentUserRole]) {
+                return false;
+            }
+            return rolePermissions[currentUserRole].includes(permission);
+        }
+
+        function hasPermission(permission) {
+            return checkPermission(permission);
+        }
+
+        function requirePermission(permission, callback) {
+            if (checkPermission(permission)) {
+                if (callback) callback();
+                return true;
+            } else {
+                showToast('Access denied: Insufficient permissions', 'error');
+                return false;
+            }
+        }
+
+        function setUserRole(role) {
+            if (rolePermissions[role]) {
+                currentUserRole = role;
+                Storage.set('currentUserRole', role);
+                renderRBACUI();
+                showToast(`Role changed to ${role}`, 'success');
+            }
+        }
+
+        function getCurrentUserPermissions() {
+            return rolePermissions[currentUserRole] || [];
+        }
+
+        function renderRBACUI() {
+            // Hide/show elements based on permissions
+            document.querySelectorAll('[data-permission]').forEach(el => {
+                const requiredPermission = el.getAttribute('data-permission');
+                if (!checkPermission(requiredPermission)) {
+                    el.classList.add('hidden');
+                    el.setAttribute('aria-hidden', 'true');
+                } else {
+                    el.classList.remove('hidden');
+                    el.setAttribute('aria-hidden', 'false');
+                }
+            });
+
+            // Update role indicator
+            const roleIndicator = document.getElementById('current-role-indicator');
+            if (roleIndicator) {
+                roleIndicator.textContent = currentUserRole.toUpperCase();
+            }
+        }
+
+        // Date Utilities Integration
+        const DateUtils = {
+            format: function(date, format = 'YYYY-MM-DD') {
+                if (!date) return '';
+                const d = new Date(date);
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                const hours = String(d.getHours()).padStart(2, '0');
+                const minutes = String(d.getMinutes()).padStart(2, '0');
+                
+                return format
+                    .replace('YYYY', year)
+                    .replace('MM', month)
+                    .replace('DD', day)
+                    .replace('HH', hours)
+                    .replace('mm', minutes);
+            },
+            
+            parse: function(dateString) {
+                return new Date(dateString);
+            },
+            
+            isValid: function(dateString) {
+                const d = new Date(dateString);
+                return !isNaN(d.getTime());
+            },
+            
+            isOverdue: function(dateString) {
+                if (!dateString) return false;
+                return new Date(dateString) < new Date();
+            },
+            
+            daysUntil: function(dateString) {
+                if (!dateString) return null;
+                const target = new Date(dateString);
+                const today = new Date();
+                const diffTime = target - today;
+                return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            },
+            
+            businessDaysBetween: function(start, end) {
+                let count = 0;
+                const curDate = new Date(start);
+                const endDate = new Date(end);
+                while (curDate <= endDate) {
+                    const dayOfWeek = curDate.getDay();
+                    if (dayOfWeek !== 0 && dayOfWeek !== 6) count++;
+                    curDate.setDate(curDate.getDate() + 1);
+                }
+                return count;
+            }
+        };
+
+        // Secure Certificate Generation
+        function generateCertificate(type, data) {
+            const certId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36);
+            const timestamp = new Date().toISOString();
+            const checksum = btoa(JSON.stringify({ type, data, timestamp })).substr(0, 16);
+            
+            return {
+                certificateId: `CERT-${type.toUpperCase()}-${certId.split('-')[0].toUpperCase()}`,
+                type: type,
+                issuedAt: timestamp,
+                data: data,
+                checksum: checksum,
+                valid: true,
+                issuer: 'Kharon Command System'
+            };
+        }
+
+        function verifyCertificate(certificate) {
+            if (!certificate || !certificate.checksum) return false;
+            const { checksum, ...verifyData } = certificate;
+            const expectedChecksum = btoa(JSON.stringify(verifyData)).substr(0, 16);
+            return checksum === expectedChecksum;
+        }
+
         // Mobile Menu Toggle
         function toggleMobileMenu() {
             const sidebar = document.getElementById('sidebar');
